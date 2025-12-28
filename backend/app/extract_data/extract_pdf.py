@@ -6,7 +6,7 @@ import io
 from typing import Optional, Dict, Any
 from PIL import Image
 from dotenv import load_dotenv
-from services.key_manager_gemini import key_manager, API_KEYS
+from app.services.key_manager_gemini import key_manager, API_KEYS
 from app.utils.prompts import HISTORY_PAGE_EXTRACTION_PROMPT
 from app.utils.config import (
     MAX_PAGES_PER_PDF,

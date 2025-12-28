@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 
-from services.key_manager_gemini import key_manager
+from app.services.key_manager_gemini import key_manager
 from app.orchestrator.retriever import search_knowledge
 from app.utils.prompts import (
     ORCHESTRATOR_INTENT_PROMPT,

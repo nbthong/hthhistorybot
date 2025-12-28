@@ -1,7 +1,7 @@
 import logging
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-from services.key_manager_gemini import key_manager
+from app.services.key_manager_gemini import key_manager
 from app.utils.config import GEMINI_EMBEDDING_MODEL, LOCAL_EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
