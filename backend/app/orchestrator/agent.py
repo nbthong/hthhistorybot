@@ -11,16 +11,14 @@ from app.utils.prompts import (
 if not key_manager:
     raise RuntimeError("Gemini API keys are not configured on the server.")
 
-llm = key_manager.get_model()
-
 
 class HistoryAIAgent:
     def __init__(self) -> None:
-        self.llm = llm
+        self.key_manager = key_manager
 
     async def orchestrator(self, user_input: str) -> str:
         prompt: str = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input)
-        response = self.llm.generate_content(prompt)
+        response = self.key_manager.generate_content(prompt)
         intent: str = response.text.strip().upper()
         return intent
 
@@ -33,10 +31,8 @@ class HistoryAIAgent:
             user_input=user_input,
         )
 
-        response = self.llm.generate_content(prompt, stream=True)
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        for text in self.key_manager.stream_content(prompt):
+            yield text
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         knowledges = search_knowledge(user_input, limit=3)
@@ -47,10 +43,8 @@ class HistoryAIAgent:
             user_input=user_input,
         )
         
-        response = self.llm.generate_content(prompt, stream=True)
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        for text in self.key_manager.stream_content(prompt):
+            yield text
 
 
 agent_system = HistoryAIAgent()

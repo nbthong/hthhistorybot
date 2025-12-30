@@ -6,6 +6,7 @@ import io
 from typing import Optional, Dict, Any
 from PIL import Image
 from dotenv import load_dotenv
+from google.genai import types
 from app.services.key_manager_gemini import key_manager, API_KEYS
 from app.utils.prompts import HISTORY_PAGE_EXTRACTION_PROMPT
 from app.utils.config import (
@@ -119,19 +120,18 @@ def get_ultimate_ai_data(
     image_bytes: bytes, page_num: int, filename: str, last_chapter: str, last_topic: str
 ) -> Optional[Dict[str, Any]]:
     try:
-        img = Image.open(io.BytesIO(image_bytes))
         prompt = HISTORY_PAGE_EXTRACTION_PROMPT.format(
             page_num=page_num,
             filename=filename,
             last_chapter=last_chapter,
             last_topic=last_topic,
         )
+        image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
 
         max_retries = len(API_KEYS) if API_KEYS else 1
         for attempt in range(max_retries):
             try:
-                model = key_manager.get_model()
-                response = model.generate_content([prompt, img])
+                response = key_manager.generate_content([prompt, image_part])
                 return json.loads(response.text)
             except Exception as e:
                 if "429" in str(e) or "quota" in str(e).lower():

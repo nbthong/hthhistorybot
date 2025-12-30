@@ -1,8 +1,8 @@
 import os
 import logging
-from typing import List, Any
+from typing import Iterable, List, Any
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 from app.utils.config import PREFERRED_MODEL, GENERATION_CONFIG, ENV_FILE
 
 load_dotenv(ENV_FILE)
@@ -18,8 +18,8 @@ class GeminiKeyManager:
 
         self.keys: List[str] = keys
         self.current_index: int = 0
-        self.model_id: str = PREFERRED_MODEL.replace("models/", "")
-        self.generation_config = GENERATION_CONFIG
+        self.model_id: str = PREFERRED_MODEL
+        self.generation_config: dict[str, Any] = GENERATION_CONFIG
 
         unique_keys = set(keys)
         if len(unique_keys) < len(keys):
@@ -32,14 +32,11 @@ class GeminiKeyManager:
             f"Initialized GeminiKeyManager with {len(unique_keys)} unique API key(s), "
             f"using model: {self.model_id}"
         )
-        self.model = self._setup_model(self.keys[0])
+        self.client = self._setup_client(self.keys[0])
 
-    def _setup_model(self, key: str) -> Any:
-        """Setup model với API key được chỉ định."""
-        genai.configure(api_key=key)
-        return genai.GenerativeModel(
-            model_name=self.model_id, generation_config=self.generation_config
-        )
+    def _setup_client(self, key: str) -> genai.Client:
+        """Setup genai.Client với API key được chỉ định."""
+        return genai.Client(api_key=key)
 
     def switch_key(self) -> bool:
         """Chuyển sang API key tiếp theo trong danh sách."""
@@ -56,11 +53,37 @@ class GeminiKeyManager:
             f"({new_key[:8]}...{new_key[-8:]})"
         )
 
-        self.model = self._setup_model(new_key)
+        self.client = self._setup_client(new_key)
         return True
 
-    def get_model(self) -> Any:
-        return self.model
+    def generate_content(self, contents: Any, **kwargs: Any):
+        return self.client.models.generate_content(
+            model=self.model_id,
+            contents=contents,
+            config=self.generation_config,
+            **kwargs,
+        )
+
+    def stream_content(self, contents: Any, **kwargs: Any) -> Iterable[str]:
+        stream = self.client.models.generate_content_stream(
+            model=self.model_id,
+            contents=contents,
+            config=self.generation_config,
+            **kwargs,
+        )
+        for chunk in stream:
+            text = getattr(chunk, "text", None)
+            if not text and getattr(chunk, "candidates", None):
+                # Fallback: một số chunk có thể không set chunk.text
+                try:
+                    parts = chunk.candidates[0].content.parts or []
+                    text = "".join(
+                        [getattr(p, "text", "") for p in parts if getattr(p, "text", None)]
+                    )
+                except Exception:
+                    text = None
+            if text:
+                yield text
 
 
 if API_KEYS:
