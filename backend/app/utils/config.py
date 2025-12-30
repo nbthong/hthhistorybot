@@ -35,7 +35,7 @@ PREFERRED_MODEL = "gemini-2.5-flash"
 
 # Generation configuration
 GENERATION_CONFIG = {
-    "temperature": 0.1,
+    "temperature": 0.5,
     "response_mime_type": "application/json",
 }
 

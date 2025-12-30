@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Optional, Any
+from typing import List, Any
 from dotenv import load_dotenv
 import google.generativeai as genai
 from app.utils.config import PREFERRED_MODEL, GENERATION_CONFIG, ENV_FILE
@@ -18,7 +18,7 @@ class GeminiKeyManager:
 
         self.keys: List[str] = keys
         self.current_index: int = 0
-        self.model_id: Optional[str] = None
+        self.model_id: str = PREFERRED_MODEL.replace("models/", "")
         self.generation_config = GENERATION_CONFIG
 
         unique_keys = set(keys)
@@ -29,47 +29,20 @@ class GeminiKeyManager:
             )
 
         logging.info(
-            f"Initialized GeminiKeyManager with {len(unique_keys)} unique API key(s)"
+            f"Initialized GeminiKeyManager with {len(unique_keys)} unique API key(s), "
+            f"using model: {self.model_id}"
         )
-        self.model = self._setup_model(self.keys[0], 0)
+        self.model = self._setup_model(self.keys[0])
 
-    def _find_best_model(self, key: str) -> str:
+    def _setup_model(self, key: str) -> Any:
+        """Setup model với API key được chỉ định."""
         genai.configure(api_key=key)
-        available_models = [
-            m.name
-            for m in genai.list_models()
-            if "generateContent" in m.supported_generation_methods
-        ]
-
-        if not available_models:
-            raise ValueError("No available model found!")
-
-        selected_model_name = next(
-            (m for m in available_models if PREFERRED_MODEL in m), available_models[0]
-        )
-
-        model_id = selected_model_name.replace("models/", "")
-        if PREFERRED_MODEL not in selected_model_name:
-            logging.warning(
-                f"Preferred model '{PREFERRED_MODEL}' not found, using: {model_id}"
-            )
-        else:
-            logging.info(f"Using model: {model_id}")
-
-        return model_id
-
-    def _setup_model(self, key: str, key_index: int) -> Any:
-        """Setup model with a new API key."""
-        genai.configure(api_key=key)
-
-        if not self.model_id:
-            self.model_id = self._find_best_model(key)
-
         return genai.GenerativeModel(
             model_name=self.model_id, generation_config=self.generation_config
         )
 
     def switch_key(self) -> bool:
+        """Chuyển sang API key tiếp theo trong danh sách."""
         if not self.keys:
             logging.error("No API keys configured")
             return False
@@ -83,7 +56,7 @@ class GeminiKeyManager:
             f"({new_key[:8]}...{new_key[-8:]})"
         )
 
-        self.model = self._setup_model(new_key, self.current_index)
+        self.model = self._setup_model(new_key)
         return True
 
     def get_model(self) -> Any:

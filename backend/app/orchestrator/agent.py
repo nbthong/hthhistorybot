@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import AsyncIterable
 
 from app.services.key_manager_gemini import key_manager
 from app.orchestrator.retriever import search_knowledge
@@ -8,6 +8,9 @@ from app.utils.prompts import (
     QUIZ_GENERATION_PROMPT,
 )
 
+if not key_manager:
+    raise RuntimeError("Gemini API keys are not configured on the server.")
+
 llm = key_manager.get_model()
 
 
@@ -15,30 +18,39 @@ class HistoryAIAgent:
     def __init__(self) -> None:
         self.llm = llm
 
-    def orchestrator(self, user_input: str) -> str:
+    async def orchestrator(self, user_input: str) -> str:
         prompt: str = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input)
-        intent: str = self.llm.generate_content(prompt).text.strip().upper()
+        response = self.llm.generate_content(prompt)
+        intent: str = response.text.strip().upper()
         return intent
 
-    def rag_agent(self, user_input: str) -> str:
-        knowledges: List[Dict[str, Any]] = search_knowledge(user_input)
-        context: str = "\n---\n".join([k["content_text"] for k in knowledges])
+    async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
+        knowledges = search_knowledge(user_input)
+        context = "\n---\n".join([k["content_text"] for k in knowledges])
 
-        prompt: str = RAG_ANSWER_PROMPT.format(
+        prompt = RAG_ANSWER_PROMPT.format(
             context=context,
             user_input=user_input,
         )
-        return self.llm.generate_content(prompt).text
 
-    def quiz_agent(self, user_input: str) -> str:
-        knowledges: List[Dict[str, Any]] = search_knowledge(user_input, limit=3)
-        context: str = "\n---\n".join([k["content_text"] for k in knowledges])
+        response = self.llm.generate_content(prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
 
-        prompt: str = QUIZ_GENERATION_PROMPT.format(
+    async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
+        knowledges = search_knowledge(user_input, limit=3)
+        context = "\n---\n".join([k["content_text"] for k in knowledges])
+
+        prompt = QUIZ_GENERATION_PROMPT.format(
             context=context,
             user_input=user_input,
         )
-        return self.llm.generate_content(prompt).text
+        
+        response = self.llm.generate_content(prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
 
 
 agent_system = HistoryAIAgent()

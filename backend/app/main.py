@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.orchestrator.agent import agent_system
+from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="Lịch Sử 12 AI Tutor API")
 
@@ -23,20 +24,13 @@ async def root():
 async def chat(request: ChatRequest):
     try:
         user_msg = request.message
-        
-        intent = agent_system.orchestrator(user_msg)
-        
+        intent = await agent_system.orchestrator(user_msg)
         if "QUIZ" in intent:
-            response = agent_system.quiz_agent(user_msg)
-            agent_type = "Quiz Agent"
+            generator = agent_system.quiz_agent_stream(user_msg)
         else:
-            response = agent_system.rag_agent(user_msg)
-            agent_type = "RAG Agent"
+            generator = agent_system.rag_agent_stream(user_msg)
             
-        return {
-            "reply": response,
-            "intent": intent,
-            "agent": agent_type
-        }
+        return StreamingResponse(generator, media_type="text/plain")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
