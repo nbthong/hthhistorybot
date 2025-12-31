@@ -77,6 +77,11 @@ def process_and_store_vectors() -> None:
         # perform embedding
         texts: List[str] = [c["text"] for c in chunks_to_embed]
         vectors = embedder.embed_documents(texts)
+        if len(vectors) != len(texts):
+            raise ValueError(
+                f"Embedding output mismatch: vectors={len(vectors)} texts={len(texts)}"
+            )
+        embedding_dim: int = len(vectors[0]) if vectors else 0
 
         # save to MongoDB
         for i, vector in enumerate(vectors):
@@ -89,6 +94,8 @@ def process_and_store_vectors() -> None:
                 "content_text": chunks_to_embed[i]["text"],
                 "content_type": chunks_to_embed[i]["type"],
                 "embedding_vector": vector,
+                "embedding_model": getattr(embedder, "model_name", "unknown"),
+                "embedding_dim": embedding_dim,
                 "processed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
 
