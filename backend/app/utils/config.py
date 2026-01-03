@@ -31,13 +31,30 @@ OUTPUT_JSON = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
 # ============================================================================
 
 # model name
-PREFERRED_MODEL = "gemini-2.5-flash"
+MODEL_EXTRACT = "gemini-2.5-flash"  # Model cho extract PDF (vision + JSON)
+MODEL_GEN_IMAGE = "imagen-4.0-fast-generate"
+MODEL_EMBEDDING = "text-embedding-004"
+MODEL_EMBEDDING_1 = "BAAI/bge-m3"
+MODEL_ANSWER = "gemini-2.0-flash-exp"  # Model cho RAG/Quiz generation
+PREFERRED_MODEL = MODEL_ANSWER  # Default model cho key_manager (backward compatible)
 
 # Generation configuration
 GENERATION_CONFIG = {
     "temperature": 0.5,
     "response_mime_type": "application/json",
 }
+
+# Generation config cho extract (cần JSON output)
+EXTRACT_GENERATION_CONFIG = {
+    "temperature": 0.1,  
+    "response_mime_type": "application/json",
+    "max_output_tokens": 8192,  
+}
+
+# Vector search defaults
+VECTOR_TOP_K = 5
+VECTOR_NUM_CANDIDATES = 50
+VECTOR_SCORE_THRESHOLD: float | None = None  # Set float if want to filter score
 
 
 # ============================================================================
@@ -70,9 +87,16 @@ CHROMA_PERSIST_DIR = os.path.join(PROJECT_ROOT, "chroma_db")
 
 
 # Chunking configuration
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 100
+CHUNK_SIZE = 1024
+CHUNK_OVERLAP = 200
 
 # Model Embedding Local
-GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
-LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+LOCAL_EMBEDDING_MODEL = "BAAI/bge-m3"
+
+# Embedding mode configuration
+USE_SPARSE_EMBEDDING = True  # Enable sparse vectors (lexical matching, BM25-like)
+USE_COLBERT_EMBEDDING = False  # Disable ColBERT (RAM intensive, slower)
+
+# Hybrid search weights
+HYBRID_SEARCH_DENSE_WEIGHT = 0.7  # Weight for dense vector search (0-1)
+HYBRID_SEARCH_SPARSE_WEIGHT = 0.3  # Weight for sparse/lexical search (0-1)

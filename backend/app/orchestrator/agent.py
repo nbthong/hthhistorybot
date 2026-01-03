@@ -23,8 +23,15 @@ class HistoryAIAgent:
         return intent
 
     async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
-        knowledges = search_knowledge(user_input)
-        context = "\n---\n".join([k["content_text"] for k in knowledges])
+        knowledges = search_knowledge(user_input, use_hybrid=True)
+        
+        # Format context with metadata (page_id, chapter, topic) to LLM quote
+        context_parts = []
+        for k in knowledges:
+            page_info = f"[Trang {k.get('page_id', '?')} - {k.get('chapter', '')} - {k.get('topic', '')}]"
+            context_parts.append(f"{page_info}\n{k['content_text']}")
+        
+        context = "\n\n---\n\n".join(context_parts)
 
         prompt = RAG_ANSWER_PROMPT.format(
             context=context,
@@ -35,8 +42,15 @@ class HistoryAIAgent:
             yield text
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
-        knowledges = search_knowledge(user_input, limit=3)
-        context = "\n---\n".join([k["content_text"] for k in knowledges])
+        knowledges = search_knowledge(user_input, limit=3, use_hybrid=True)
+        
+        # Format context với metadata
+        context_parts = []
+        for k in knowledges:
+            page_info = f"[Trang {k.get('page_id', '?')} - {k.get('topic', '')}]"
+            context_parts.append(f"{page_info}\n{k['content_text']}")
+        
+        context = "\n\n---\n\n".join(context_parts)
 
         prompt = QUIZ_GENERATION_PROMPT.format(
             context=context,
