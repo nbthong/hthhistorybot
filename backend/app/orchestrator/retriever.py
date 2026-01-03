@@ -1,8 +1,10 @@
 from app.databases.database import get_collection
+from app.databases.vector_store import aggregate_vector_search_with_optional_filter
 from app.chunk_embedding.embedder import HybridEmbedder
 from app.utils.config import (
     LOCAL_EMBEDDING_MODEL,
     MONGO_VECTOR_COLLECTION,
+    MONGO_VECTOR_COLLECTION_NEW,
     VECTOR_TOP_K,
     VECTOR_NUM_CANDIDATES,
     VECTOR_SCORE_THRESHOLD,
@@ -18,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 embedder = HybridEmbedder(use_sparse=USE_SPARSE_EMBEDDING, use_colbert=False)
 
-
 def search_knowledge(
     query: str,
     limit: int | None = None,
@@ -28,6 +29,7 @@ def search_knowledge(
 
     top_k = limit or VECTOR_TOP_K
     candidates = num_candidates or VECTOR_NUM_CANDIDATES
+    # collection = get_collection(MONGO_VECTOR_COLLECTION_NEW)
     collection = get_collection(MONGO_VECTOR_COLLECTION)
     
     # If sparse is not enabled or hybrid is not desired, use dense only
@@ -44,34 +46,26 @@ def _search_dense_only(
     candidates: int, 
     collection
 ) -> List[Dict[str, Any]]:
-    """Tìm kiếm chỉ dùng dense vector (backward compatible)."""
     query_vector = embedder.embed_query(query)
     
-    pipeline = [
-        {
-            "$vectorSearch": {
-                "index": "vector_index",
-                "path": "embedding_vector",
-                "queryVector": query_vector,
-                "filter": {"embedding_model": LOCAL_EMBEDDING_MODEL},
-                "numCandidates": candidates,
-                "limit": top_k,
-            }
-        },
-        {
-            "$project": {
-                "content_text": 1,
-                "chapter": 1,
-                "topic": 1,
-                "page_id": 1,
-                "source": 1,
-                "score": {"$meta": "vectorSearchScore"},
-            }
-        },
-    ]
+    project_stage = {
+        "content_text": 1,
+        "chapter": 1,
+        "topic": 1,
+        "page_id": 1,
+        "source": 1,
+        "score": {"$meta": "vectorSearchScore"},
+    }
     
     try:
-        results = list(collection.aggregate(pipeline))
+        results = aggregate_vector_search_with_optional_filter(
+            collection=collection,
+            query_vector=query_vector,
+            candidates=candidates,
+            limit=top_k,
+            project_stage=project_stage,
+            embedding_model_filter=LOCAL_EMBEDDING_MODEL,
+        )
         logger.info(f"Dense search returned {len(results)} results")
     except Exception as e:
         logger.warning("Vector search failed, fallback to text search. Error: %s", e)
@@ -123,32 +117,25 @@ def _search_hybrid(
     # Get more candidates to have enough for re-ranking
     retrieval_limit = min(top_k * 3, candidates)
     
-    pipeline = [
-        {
-            "$vectorSearch": {
-                "index": "vector_index",
-                "path": "embedding_vector",
-                "queryVector": query_vector,
-                "filter": {"embedding_model": LOCAL_EMBEDDING_MODEL},
-                "numCandidates": candidates,
-                "limit": retrieval_limit,
-            }
-        },
-        {
-            "$project": {
-                "content_text": 1,
-                "chapter": 1,
-                "topic": 1,
-                "page_id": 1,
-                "source": 1,
-                "lexical_weights": 1,  # Get sparse weights of document
-                "dense_score": {"$meta": "vectorSearchScore"},
-            }
-        },
-    ]
+    project_stage = {
+        "content_text": 1,
+        "chapter": 1,
+        "topic": 1,
+        "page_id": 1,
+        "source": 1,
+        "lexical_weights": 1,  # Get sparse weights of document
+        "dense_score": {"$meta": "vectorSearchScore"},
+    }
     
     try:
-        candidates_results = list(collection.aggregate(pipeline))
+        candidates_results = aggregate_vector_search_with_optional_filter(
+            collection=collection,
+            query_vector=query_vector,
+            candidates=candidates,
+            limit=retrieval_limit,
+            project_stage=project_stage,
+            embedding_model_filter=LOCAL_EMBEDDING_MODEL,
+        )
         logger.info(f"Dense search returned {len(candidates_results)} candidates for hybrid re-ranking")
     except Exception as e:
         logger.warning("Hybrid search failed, fallback to dense only. Error: %s", e)

@@ -5,7 +5,11 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
 from dotenv import load_dotenv
-from app.utils.config import MONGO_DB_NAME, MONGO_COLLECTION_NAME, ENV_FILE
+from app.utils.config import (
+    ENV_FILE,
+    MONGO_COLLECTION_NAME,
+    MONGO_DB_NAME,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -65,6 +69,22 @@ def get_collection(name: str | None = None) -> Collection:
     if name:
         return _db[name]
     return _collection
+
+
+def get_kb_collection() -> Collection:
+    return get_collection(MONGO_COLLECTION_NAME)
+
+
+def ensure_kb_indexes() -> None:
+    kb = get_kb_collection()
+    try:
+        kb.create_index("doc_id", unique=True)
+    except Exception as e:
+        logger.warning("KB index 'doc_id' may already exist: %s", e)
+    try:
+        kb.create_index("page_id")
+    except Exception as e:
+        logger.warning("KB index 'page_id' may already exist: %s", e)
 
 
 def close_connection() -> None:

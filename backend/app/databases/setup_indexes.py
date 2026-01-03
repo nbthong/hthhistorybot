@@ -1,6 +1,7 @@
 import logging
-from app.databases.database import get_database, get_collection
-from app.utils.config import MONGO_VECTOR_COLLECTION, MONGO_COLLECTION_NAME
+from app.databases.database import ensure_kb_indexes, get_database
+from app.databases.vector_store import ensure_vector_indexes
+from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_NEW
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,58 +12,15 @@ def create_indexes():
     
     # Collection knowledge_base
     logger.info(f"Setting up indexes for '{MONGO_COLLECTION_NAME}'...")
-    kb_collection = db[MONGO_COLLECTION_NAME]
-    
-    try:
-        # Unique index trên doc_id
-        kb_collection.create_index("doc_id", unique=True)
-        logger.info("✅ Created unique index on 'doc_id'")
-    except Exception as e:
-        logger.warning(f"Index 'doc_id' may already exist: {e}")
-    
-    try:
-        # Index trên page_id để query nhanh
-        kb_collection.create_index("page_id")
-        logger.info("✅ Created index on 'page_id'")
-    except Exception as e:
-        logger.warning(f"Index 'page_id' may already exist: {e}")
+    ensure_kb_indexes()
+    logger.info("✅ KB indexes ensured")
     
     # Collection knowledge_vectors
-    logger.info(f"\nSetting up indexes for '{MONGO_VECTOR_COLLECTION}'...")
-    vector_collection = db[MONGO_VECTOR_COLLECTION]
+    logger.info(f"\nSetting up indexes for '{MONGO_VECTOR_COLLECTION_NEW}'...")
+    ensure_vector_indexes(MONGO_VECTOR_COLLECTION_NEW)
+    logger.info("✅ Vector indexes ensured")
     
-    try:
-        # Compound unique index: (doc_id, content_text)
-        vector_collection.create_index(
-            [("doc_id", 1), ("content_text", 1)],
-            unique=True
-        )
-        logger.info("✅ Created compound unique index on ('doc_id', 'content_text')")
-    except Exception as e:
-        logger.warning(f"Compound index may already exist: {e}")
-    
-    try:
-        # Index trên embedding_model (quan trọng cho vector search filter)
-        vector_collection.create_index("embedding_model")
-        logger.info("✅ Created index on 'embedding_model'")
-    except Exception as e:
-        logger.warning(f"Index 'embedding_model' may already exist: {e}")
-    
-    try:
-        # Text index trên content_text cho $text search
-        vector_collection.create_index([("content_text", "text")])
-        logger.info("✅ Created text index on 'content_text'")
-    except Exception as e:
-        logger.warning(f"Text index may already exist: {e}")
-    
-    try:
-        # Index trên page_id
-        vector_collection.create_index("page_id")
-        logger.info("✅ Created index on 'page_id'")
-    except Exception as e:
-        logger.warning(f"Index 'page_id' may already exist: {e}")
-    
-    # 3. Vector Search Index (chỉ MongoDB Atlas hỗ trợ)
+    # Vector Search Index (only MongoDB Atlas supported)
     logger.info("\n" + "="*60)
     logger.info("⚠️  VECTOR SEARCH INDEX (Chỉ trên MongoDB Atlas)")
     logger.info("="*60)
@@ -77,7 +35,7 @@ def list_indexes():
     logger.info("CURRENT INDEXES")
     logger.info("="*60)
     
-    for coll_name in [MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION]:
+    for coll_name in [MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_NEW]:
         logger.info(f"\nCollection: {coll_name}")
         collection = db[coll_name]
         indexes = list(collection.list_indexes())
