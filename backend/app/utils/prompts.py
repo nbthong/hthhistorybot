@@ -44,6 +44,49 @@ Return JSON with the following structure:
 IMPORTANT: All extracted text content must be in accurate Vietnamese only.
 """
 
+HISTORY_PAGE_EXTRACTION_PROMPT_NEW: str = """
+You are an expert in digitizing historical textbook materials. This is page {page_num} from file '{filename}'.
+
+CONTEXT FROM PREVIOUS PAGE (if available):
+- Current chapter: {last_chapter}
+- Current topic: {last_topic}
+
+STRICT LANGUAGE REQUIREMENT:
+- All outputs MUST be in Vietnamese only (no English, no mixed languages).
+- Preserve Vietnamese diacritics. Do NOT translate Vietnamese to English.
+- If the source appears English or mixed, still output Vietnamese descriptions.
+
+YOUR TASK:
+1. Analyze the image of page {page_num}.
+2. If this page does NOT contain a new Chapter or Topic title, reuse the context from the previous page.
+3. If there is a new title, update it accordingly.
+4. REQUIRED FORMAT: 
+   - Chapter must have prefix 'Chương X: ...' (Vietnamese format)
+   - Topic must have prefix 'Bài Y. ...' (Vietnamese format)
+
+Return JSON with the following structure:
+{{
+    "page_info": {{
+        "page_id": {page_num},
+        "type": "CONTENT | TOC | GLOSSARY | APPENDIX",
+        "chapter": "Chương X: [Tên chương]",
+        "topic": "Bài Y. [Tên bài học]"
+    }},
+    "content_segments": [
+        {{
+            "heading": "Tiêu đề mục nhỏ",
+            "text": "Văn bản thô",
+            "table_markdown": "Markdown Table nếu có"
+        }}
+    ]
+}}
+
+CRITICAL REQUIREMENTS:
+1. The "page_id" field MUST be exactly {page_num} (the page number provided above). Do NOT use any other value.
+2. Do NOT read page numbers from the image - use the provided page number {page_num} directly.
+3. All extracted text content must be in accurate Vietnamese only.
+"""
+
 
 # Prompt orchestrate intent (LEARN/QUIZ)
 ORCHESTRATOR_INTENT_PROMPT: str = """

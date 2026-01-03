@@ -12,16 +12,17 @@ API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 class GeminiKeyManager:
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str] = None,
         model_name: Optional[str] = None,
         generation_config: Optional[dict[str, Any]] = None,
     ):
-        if not api_key:
+        self.api_key: str = api_key or API_KEY
+        if not self.api_key:
             raise ValueError("API key cannot be empty!")
 
         self.model_name: str = model_name or PREFERRED_MODEL
         self.generation_config: dict[str, Any] = generation_config or GENERATION_CONFIG
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=self.api_key)
 
     def _extract_text_from_chunk(self, chunk: Any) -> Optional[str]:
         """Extract text from chunk optimally."""
@@ -55,7 +56,7 @@ class GeminiKeyManager:
                 yield text
 
 if API_KEY:
-    key_manager = GeminiKeyManager(API_KEY)
+    key_manager = GeminiKeyManager()
 else:
     key_manager = None
     logging.warning("No API key found! Please set GOOGLE_API_KEY in environment variables.")

@@ -1,4 +1,5 @@
 import os
+from google.genai import types
 
 # ============================================================================
 # Path Configuration
@@ -22,8 +23,13 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "app", "resources")
 # Extract data directory (where history_ultimate_db.json is stored)
 EXTRACT_DATA_DIR = os.path.join(PROJECT_ROOT, "app", "extract_data")
 
-# Output JSON file path
-OUTPUT_JSON = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
+# Output JSON file path extract data
+OUTPUT_JSON_DATA = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
+OUTPUT_JSON_DATA_TEST = os.path.join(EXTRACT_DATA_DIR, "test_structure_data_new.json")
+
+# Output JSON file path chunk embedding
+OUTPUT_JSON_CHUNK_EMBEDDING = os.path.join(EXTRACT_DATA_DIR, "merge_content.json")
+OUTPUT_JSON_CHUNK_EMBEDDING_TEST = os.path.join(EXTRACT_DATA_DIR, "merge_content_test.json")
 
 
 # ============================================================================
@@ -35,13 +41,14 @@ MODEL_EXTRACT = "gemini-2.5-flash"  # Model cho extract PDF (vision + JSON)
 MODEL_GEN_IMAGE = "imagen-4.0-fast-generate"
 MODEL_EMBEDDING = "text-embedding-004"
 MODEL_EMBEDDING_1 = "BAAI/bge-m3"
-MODEL_ANSWER = "gemini-2.0-flash-exp"  # Model cho RAG/Quiz generation
+MODEL_ANSWER = "gemini-2.0-flash"  # Model cho RAG/Quiz generation
 PREFERRED_MODEL = MODEL_ANSWER  # Default model cho key_manager (backward compatible)
 
 # Generation configuration
 GENERATION_CONFIG = {
     "temperature": 0.5,
     "response_mime_type": "application/json",
+    "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
 }
 
 # Generation config cho extract (cần JSON output)
@@ -49,12 +56,14 @@ EXTRACT_GENERATION_CONFIG = {
     "temperature": 0.1,  
     "response_mime_type": "application/json",
     "max_output_tokens": 8192,  
+    "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
 }
 
 # Vector search defaults
 VECTOR_TOP_K = 5
 VECTOR_NUM_CANDIDATES = 50
 VECTOR_SCORE_THRESHOLD: float | None = None  # Set float if want to filter score
+USE_EMBEDDING_MODEL_FILTER = True 
 
 
 # ============================================================================
@@ -73,6 +82,9 @@ RATE_LIMIT_RETRY_DELAY = 10  # seconds
 # Zoom matrix for PDF page rendering
 PDF_ZOOM_MATRIX = 2.5
 
+# Batch save configuration (save every N pages to reduce I/O)
+SAVE_BATCH_SIZE = 10  # Save to file every N pages
+
 
 # ============================================================================
 # MongoDB Configuration
@@ -80,7 +92,13 @@ PDF_ZOOM_MATRIX = 2.5
 
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
+MONGO_COLLECTION_NAME_TEST = "knowledge_base_test"
+
 MONGO_VECTOR_COLLECTION = "knowledge_vectors"
+MONGO_VECTOR_COLLECTION_NEW = "knowledge_vectors_new"
+
+MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
+MONGO_ATLAS_VECTOR_PATH = "embedding_vector"
 
 
 CHROMA_PERSIST_DIR = os.path.join(PROJECT_ROOT, "chroma_db")
@@ -89,6 +107,8 @@ CHROMA_PERSIST_DIR = os.path.join(PROJECT_ROOT, "chroma_db")
 # Chunking configuration
 CHUNK_SIZE = 1024
 CHUNK_OVERLAP = 200
+EMBED_BATCH_SIZE = 96
+MONGO_BULK_WRITE_BATCH_SIZE = 500
 
 # Model Embedding Local
 LOCAL_EMBEDDING_MODEL = "BAAI/bge-m3"
