@@ -1,7 +1,7 @@
 import logging
 from app.databases.database import ensure_kb_indexes, get_database
 from app.databases.vector_store import ensure_vector_indexes
-from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_NEW, MONGO_VECTOR_COLLECTION_GEMINI
+from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_GEMINI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

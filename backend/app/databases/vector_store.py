@@ -7,18 +7,18 @@ from pymongo.collection import Collection
 
 from app.databases.database import get_collection
 from app.utils.config import (
-    LOCAL_EMBEDDING_MODEL,
     MONGO_ATLAS_VECTOR_INDEX_NAME,
     MONGO_ATLAS_VECTOR_PATH,
-    MONGO_VECTOR_COLLECTION_NEW,
+    MONGO_VECTOR_COLLECTION_GEMINI,
     USE_EMBEDDING_MODEL_FILTER,
+    MODEL_EMBEDDING,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def get_vector_collection(name: str | None = None) -> Collection:
-    return get_collection(name or MONGO_VECTOR_COLLECTION_NEW)
+    return get_collection(name or MONGO_VECTOR_COLLECTION_GEMINI)
 
 
 def ensure_vector_indexes(collection_name: str | None = None) -> None:
@@ -56,7 +56,7 @@ def aggregate_vector_search_with_optional_filter(
     candidates: int,
     limit: int,
     project_stage: Dict[str, Any],
-    embedding_model_filter: str | None = LOCAL_EMBEDDING_MODEL,
+    embedding_model_filter: str | None = MODEL_EMBEDDING,
 ) -> List[Dict[str, Any]]:
 
     vector_search: Dict[str, Any] = {

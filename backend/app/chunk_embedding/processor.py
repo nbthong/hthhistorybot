@@ -26,7 +26,7 @@ def run(
         include_non_content_pages=include_non_content_pages,
     )
 
-    embed_and_store_lessons_gemini(merged, mongo_collection_name=mongo_vector_collection_name)
+    embed_and_store_lessons_gemini(merged, mongo_collection_name=MONGO_VECTOR_COLLECTION_GEMINI)
     return merged
 
 

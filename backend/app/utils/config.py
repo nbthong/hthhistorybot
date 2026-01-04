@@ -25,11 +25,8 @@ EXTRACT_DATA_DIR = os.path.join(PROJECT_ROOT, "app", "extract_data")
 
 # Output JSON file path extract data
 OUTPUT_JSON_DATA = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
-OUTPUT_JSON_DATA_TEST = os.path.join(EXTRACT_DATA_DIR, "test_structure_data_new.json")
 
 # Output JSON file path chunk embedding
-OUTPUT_JSON_CHUNK_EMBEDDING = os.path.join(EXTRACT_DATA_DIR, "merge_content.json")
-OUTPUT_JSON_CHUNK_EMBEDDING_TEST = os.path.join(EXTRACT_DATA_DIR, "merge_content_test.json")
 OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI = os.path.join(EXTRACT_DATA_DIR, "merge_content_gemini.json")
 
 # ============================================================================
@@ -40,7 +37,6 @@ OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI = os.path.join(EXTRACT_DATA_DIR, "merge_conte
 MODEL_EXTRACT = "gemini-2.5-flash"  # Model cho extract PDF (vision + JSON)
 MODEL_GEN_IMAGE = "imagen-4.0-fast-generate"
 MODEL_EMBEDDING = "text-embedding-004"
-MODEL_EMBEDDING_1 = "BAAI/bge-m3"
 MODEL_ANSWER = "gemini-2.0-flash"  # Model cho RAG/Quiz generation
 PREFERRED_MODEL = MODEL_ANSWER  # Default model cho key_manager (backward compatible)
 
@@ -92,17 +88,10 @@ SAVE_BATCH_SIZE = 10  # Save to file every N pages
 
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
-MONGO_COLLECTION_NAME_TEST = "knowledge_base_test"
-
-MONGO_VECTOR_COLLECTION = "knowledge_vectors"
-MONGO_VECTOR_COLLECTION_NEW = "knowledge_vectors_new"
 MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"
-
-
-CHROMA_PERSIST_DIR = os.path.join(PROJECT_ROOT, "chroma_db")
 
 
 # Chunking configuration
@@ -111,8 +100,6 @@ CHUNK_OVERLAP = 200
 EMBED_BATCH_SIZE = 96
 MONGO_BULK_WRITE_BATCH_SIZE = 500
 
-# Model Embedding Local
-LOCAL_EMBEDDING_MODEL = "BAAI/bge-m3"
 
 # Embedding mode configuration
 USE_SPARSE_EMBEDDING = True  # Enable sparse vectors (lexical matching, BM25-like)
