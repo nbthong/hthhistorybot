@@ -15,7 +15,7 @@ from app.utils.config import (
     RATE_LIMIT_DELAY,
     PDF_ZOOM_MATRIX,
     DATA_DIR,
-    OUTPUT_JSON,
+    OUTPUT_JSON_DATA,
     ENV_FILE,
     MODEL_EXTRACT,
     EXTRACT_GENERATION_CONFIG,
@@ -279,16 +279,16 @@ def _parse_response_text(text: str) -> Dict[str, Any]:
 
 def load_local_db() -> list:
     """Load local database from file test_structure_data_new.json."""
-    if not os.path.exists(OUTPUT_JSON) or os.path.getsize(OUTPUT_JSON) == 0:
+    if not os.path.exists(OUTPUT_JSON_DATA) or os.path.getsize(OUTPUT_JSON_DATA) == 0:
         return []
 
     try:
-        with open(OUTPUT_JSON, "r", encoding="utf-8") as f:
+        with open(OUTPUT_JSON_DATA, "r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
-        backup_path = f"{OUTPUT_JSON}.bak"
+        backup_path = f"{OUTPUT_JSON_DATA}.bak"
         try:
-            os.replace(OUTPUT_JSON, backup_path)
+            os.replace(OUTPUT_JSON_DATA, backup_path)
             logger.warning(f"Local DB corrupted, backed up to {backup_path}. Error: {e}")
         except OSError:
             logger.warning(f"Local DB corrupted and cannot be moved. Error: {e}")
@@ -299,7 +299,7 @@ def load_local_db() -> list:
 
 def save_local_db(local_db: list) -> None:
     """Save local database vào file test_structure_data_new.json."""
-    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+    with open(OUTPUT_JSON_DATA, "w", encoding="utf-8") as f:
         json.dump(local_db, f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
