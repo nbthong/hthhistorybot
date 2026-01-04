@@ -1,9 +1,7 @@
 import os
 from google.genai import types
 
-# ============================================================================
 # Path Configuration
-# ============================================================================
 def get_project_root() -> str:
     current_file_dir = os.path.dirname(os.path.abspath(__file__))
     app_dir = os.path.dirname(current_file_dir) 
@@ -29,44 +27,33 @@ OUTPUT_JSON_DATA = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
 # Output JSON file path chunk embedding
 OUTPUT_JSON_CHUNK_EMBEDDING = os.path.join(EXTRACT_DATA_DIR, "merge_content.json")
 
-
-# ============================================================================
-# AI Configuration
-# ============================================================================
-
 # model name
-MODEL_EXTRACT = "gemini-2.5-flash"  # Model cho extract PDF (vision + JSON)
-MODEL_GEN_IMAGE = "imagen-4.0-fast-generate"
-MODEL_EMBEDDING = "text-embedding-004"
-MODEL_EMBEDDING_1 = "BAAI/bge-m3"
-MODEL_ANSWER = "gemini-2.0-flash"  # Model cho RAG/Quiz generation
-PREFERRED_MODEL = MODEL_ANSWER  # Default model cho key_manager (backward compatible)
+MODEL_EXTRACT = "gemini-2.5-flash" 
+MODEL_GEN_IMAGE = "gemini-2.5-flash-image"
+LOCAL_EMBEDDING_MODEL = "BAAI/bge-m3"
+MODEL_ANSWER = "gemini-2.0-flash"  
+PREFERRED_MODEL = MODEL_ANSWER  
 
-# Generation configuration
-GENERATION_CONFIG = {
-    "temperature": 0.5,
-    "response_mime_type": "application/json",
-    "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
-}
+# Generation configuration (Text streaming)
+TEXT_GENERATION_CONFIG = types.GenerateContentConfig(
+    temperature=0.5,
+    response_mime_type="text/plain",
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+)
 
-# Generation config cho extract (cần JSON output)
-EXTRACT_GENERATION_CONFIG = {
-    "temperature": 0.1,  
-    "response_mime_type": "application/json",
-    "max_output_tokens": 8192,  
-    "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
-}
+# Generation config for extract
+EXTRACT_GENERATION_CONFIG = types.GenerateContentConfig(
+    temperature=0.1,
+    response_mime_type="application/json",
+    max_output_tokens=8192,
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+)
 
 # Vector search defaults
 VECTOR_TOP_K = 5
 VECTOR_NUM_CANDIDATES = 50
-VECTOR_SCORE_THRESHOLD: float | None = None  # Set float if want to filter score
+VECTOR_SCORE_THRESHOLD: float | None = None
 USE_EMBEDDING_MODEL_FILTER = True 
-
-
-# ============================================================================
-# PDF Processing Configuration
-# ============================================================================
 
 # Maximum number of pages to process per PDF file
 MAX_PAGES_PER_PDF = -1
@@ -83,11 +70,6 @@ PDF_ZOOM_MATRIX = 2.5
 # Batch save configuration (save every N pages to reduce I/O)
 SAVE_BATCH_SIZE = 10  # Save to file every N pages
 
-
-# ============================================================================
-# MongoDB Configuration
-# ============================================================================
-
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
 MONGO_VECTOR_COLLECTION = "knowledge_vectors"
@@ -95,18 +77,11 @@ MONGO_VECTOR_COLLECTION = "knowledge_vectors"
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"
 
-
-CHROMA_PERSIST_DIR = os.path.join(PROJECT_ROOT, "chroma_db")
-
-
 # Chunking configuration
 CHUNK_SIZE = 1024
 CHUNK_OVERLAP = 200
 EMBED_BATCH_SIZE = 96
 MONGO_BULK_WRITE_BATCH_SIZE = 500
-
-# Model Embedding Local
-LOCAL_EMBEDDING_MODEL = "BAAI/bge-m3"
 
 # Embedding mode configuration
 USE_SPARSE_EMBEDDING = True  # Enable sparse vectors (lexical matching, BM25-like)
