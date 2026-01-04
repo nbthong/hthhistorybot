@@ -1,9 +1,7 @@
 import os
 from google.genai import types
 
-# ============================================================================
 # Path Configuration
-# ============================================================================
 def get_project_root() -> str:
     current_file_dir = os.path.dirname(os.path.abspath(__file__))
     app_dir = os.path.dirname(current_file_dir) 
@@ -34,20 +32,26 @@ OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI = os.path.join(EXTRACT_DATA_DIR, "merge_conte
 # ============================================================================
 
 # model name
-MODEL_EXTRACT = "gemini-2.5-flash"  # Model cho extract PDF (vision + JSON)
-MODEL_GEN_IMAGE = "imagen-4.0-fast-generate"
+MODEL_EXTRACT = "gemini-2.5-flash" 
+MODEL_GEN_IMAGE = "gemini-2.5-flash-image"
 MODEL_EMBEDDING = "text-embedding-004"
-MODEL_ANSWER = "gemini-2.0-flash"  # Model cho RAG/Quiz generation
-PREFERRED_MODEL = MODEL_ANSWER  # Default model cho key_manager (backward compatible)
+MODEL_ANSWER = "gemini-2.0-flash"  
+PREFERRED_MODEL = MODEL_ANSWER 
 
 # Generation configuration
+TEXT_GENERATION_CONFIG = types.GenerateContentConfig(
+    temperature=0.5,
+    response_mime_type="application/json",
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+)
+
 GENERATION_CONFIG = {
     "temperature": 0.5,
     "response_mime_type": "application/json",
     "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
 }
 
-# Generation config cho extract (cần JSON output)
+# Generation config for extract
 EXTRACT_GENERATION_CONFIG = {
     "temperature": 0.1,  
     "response_mime_type": "application/json",
@@ -55,16 +59,12 @@ EXTRACT_GENERATION_CONFIG = {
     "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
 }
 
+
 # Vector search defaults
 VECTOR_TOP_K = 5
 VECTOR_NUM_CANDIDATES = 50
-VECTOR_SCORE_THRESHOLD: float | None = None  # Set float if want to filter score
+VECTOR_SCORE_THRESHOLD: float | None = None
 USE_EMBEDDING_MODEL_FILTER = True 
-
-
-# ============================================================================
-# PDF Processing Configuration
-# ============================================================================
 
 # Maximum number of pages to process per PDF file
 MAX_PAGES_PER_PDF = -1
@@ -81,11 +81,7 @@ PDF_ZOOM_MATRIX = 2.5
 # Batch save configuration (save every N pages to reduce I/O)
 SAVE_BATCH_SIZE = 10  # Save to file every N pages
 
-
-# ============================================================================
 # MongoDB Configuration
-# ============================================================================
-
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
 MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"

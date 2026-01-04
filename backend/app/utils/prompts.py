@@ -94,7 +94,7 @@ You are the orchestrator brain of an AI History Tutor system.
 Classify the user's request: '{user_input}'
 - If it's asking for knowledge, explanation, or summary: Return 'LEARN'
 - If it's requesting exercises, quizzes, or tests: Return 'QUIZ'
-Return only one word.
+Return ONLY one word: LEARN or QUIZ.
 """
 
 
@@ -149,4 +149,18 @@ QUIZ REQUIREMENTS:
    - Giải thích: [Giải thích ngắn gọn tại sao đúng dựa trên tài liệu]
 
 5. LANGUAGE: All content must be in formal Vietnamese.
+"""
+
+IMAGE_GENERATION_PROMPT: str = """
+You are a Prompt Engineer for a Historical Visualization AI.
+User Query: "{user_input}"
+Historical Context: "{context}"
+
+TASK: 
+Based ONLY on the context provided, create a highly detailed, historically accurate image description in English for a text-to-image model.
+Focus on: clothing, architecture, atmosphere, lighting, and historical era specific details.
+
+OUTPUT FORMAT: 
+Return ONLY the prompt text string. Do not include "Prompt:" prefix.
+Example: "A cinematic wide shot of the Bach Dang river battle in 938 AD, wooden stakes rising from the water, ancient Vietnamese warships with red sails, misty morning atmosphere, realistic style."
 """
