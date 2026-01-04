@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.config import OUTPUT_JSON_CHUNK_EMBEDDING_TEST, OUTPUT_JSON_CHUNK_EMBEDDING, OUTPUT_JSON_DATA, OUTPUT_JSON_DATA_TEST, CHUNK_SIZE, CHUNK_OVERLAP
+from app.utils.config import (
+    OUTPUT_JSON_DATA,
+    OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +200,6 @@ def _convert_numpy_types(obj: Any) -> Any:
     return obj
 
 def save_merge_content_json(merged: Dict[str, Any], output_path: str | Path) -> None:
-    """Save merged content to JSON file, converting numpy types to Python native types."""
     # Convert numpy types before saving
     merged_clean = _convert_numpy_types(merged)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -204,7 +208,7 @@ def save_merge_content_json(merged: Dict[str, Any], output_path: str | Path) -> 
 def run(
     *,
     history_db_path: str | Path = OUTPUT_JSON_DATA,
-    merge_output_path: str | Path = OUTPUT_JSON_CHUNK_EMBEDDING_TEST,
+    merge_output_path: str | Path = OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI,
     include_non_content_pages: bool = False,
 ) -> Dict[str, Any]:
 
@@ -215,7 +219,6 @@ def run(
     save_merge_content_json(merged, merge_output_path)
     
     logger.info(f"Merged {merged.get('count', 0)} lessons and saved to {merge_output_path}")
-    logger.info("To embed, run: python -m app.chunk_embedding.embedder")
     
     return merged
 

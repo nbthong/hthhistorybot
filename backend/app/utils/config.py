@@ -30,7 +30,7 @@ OUTPUT_JSON_DATA_TEST = os.path.join(EXTRACT_DATA_DIR, "test_structure_data_new.
 # Output JSON file path chunk embedding
 OUTPUT_JSON_CHUNK_EMBEDDING = os.path.join(EXTRACT_DATA_DIR, "merge_content.json")
 OUTPUT_JSON_CHUNK_EMBEDDING_TEST = os.path.join(EXTRACT_DATA_DIR, "merge_content_test.json")
-
+OUTPUT_JSON_CHUNK_EMBEDDING_GEMINI = os.path.join(EXTRACT_DATA_DIR, "merge_content_gemini.json")
 
 # ============================================================================
 # AI Configuration
@@ -96,6 +96,7 @@ MONGO_COLLECTION_NAME_TEST = "knowledge_base_test"
 
 MONGO_VECTOR_COLLECTION = "knowledge_vectors"
 MONGO_VECTOR_COLLECTION_NEW = "knowledge_vectors_new"
+MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"
