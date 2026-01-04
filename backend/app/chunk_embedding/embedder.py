@@ -1,10 +1,10 @@
 import logging
 import time
+import threading
 from typing import List, Optional, Dict, Any, Iterable, Set, Tuple
 from FlagEmbedding import BGEM3FlagModel
 from pymongo import UpdateOne
 
-from pathlib import Path
 from app.utils.config import (
     LOCAL_EMBEDDING_MODEL,
     USE_SPARSE_EMBEDDING,
@@ -18,6 +18,10 @@ from app.databases.vector_store import get_vector_collection
 from app.chunk_embedding.chunking import chunk_text
 
 logger = logging.getLogger(__name__)
+
+# Global singleton instance và lock để thread-safe
+_embedder_instance: Optional["HybridEmbedder"] = None
+_embedder_lock = threading.Lock()
 
 _LEXICAL_TOP_K = 100
 _EXISTING_LOOKUP_BATCH = 500
@@ -65,14 +69,28 @@ class HybridEmbedder:
     def __init__(self, use_sparse: bool = True, use_colbert: bool = False) -> None:
         self.model_name: str = LOCAL_EMBEDDING_MODEL
         self._model: Optional[BGEM3FlagModel] = None
+        self._model_lock = threading.Lock() 
         self.use_sparse = use_sparse
         self.use_colbert = use_colbert
         logger.info(f"Initializing HybridEmbedder: sparse={use_sparse}, colbert={use_colbert}")
 
     def _get_model(self) -> BGEM3FlagModel:
+        # Double-check locking pattern để đảm bảo thread-safe
         if self._model is None:
-            logger.info(f"Loading BGE-M3 model: {self.model_name} with fp16=True")
-            self._model = BGEM3FlagModel(self.model_name, use_fp16=True)
+            with self._model_lock:
+                # Check lại sau khi acquire lock (có thể thread khác đã load xong)
+                if self._model is None:
+                    try:
+                        logger.info(f"Loading BGE-M3 model: {self.model_name} with fp16=True")
+                        self._model = BGEM3FlagModel(self.model_name, use_fp16=True)
+                        logger.info("✅ BGE-M3 model loaded successfully")
+                    except MemoryError as e:
+                        logger.error(f"❌ MemoryError loading BGE-M3 model: {e}")
+                        logger.error("💡 Tip: Restart server or increase available RAM")
+                        raise
+                    except Exception as e:
+                        logger.error(f"❌ Failed to load BGE-M3 model: {e}")
+                        raise
         return self._model
 
     def embed_documents(
@@ -141,6 +159,29 @@ class HybridEmbedder:
         model = self._get_model()
         return model.compute_lexical_matching_score(query_weights, doc_weights)
 
+def get_embedder(use_sparse: bool = None, use_colbert: bool = None) -> HybridEmbedder:
+    """
+    Singleton pattern: trả về global embedder instance (thread-safe).
+    Chỉ load model 1 lần cho toàn app, reuse cho tất cả requests.
+    """
+    global _embedder_instance, _embedder_lock
+    
+    if use_sparse is None:
+        use_sparse = USE_SPARSE_EMBEDDING
+    if use_colbert is None:
+        use_colbert = USE_COLBERT_EMBEDDING
+    
+    if _embedder_instance is None:
+        with _embedder_lock:
+            # Double-check locking
+            if _embedder_instance is None:
+                _embedder_instance = HybridEmbedder(
+                    use_sparse=use_sparse,
+                    use_colbert=use_colbert,
+                )
+    return _embedder_instance
+
+
 def embed_and_store_lessons(
     merged: Dict[str, Any],
     *,
@@ -154,7 +195,8 @@ def embed_and_store_lessons(
 
     vector_col = get_vector_collection(mongo_collection_name)
 
-    embedder = HybridEmbedder(
+    # Dùng singleton embedder
+    embedder = get_embedder(
         use_sparse=USE_SPARSE_EMBEDDING,
         use_colbert=USE_COLBERT_EMBEDDING,
     )

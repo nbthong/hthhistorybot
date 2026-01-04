@@ -1,6 +1,6 @@
 from app.databases.database import get_collection
 from app.databases.vector_store import aggregate_vector_search_with_optional_filter
-from app.chunk_embedding.embedder import HybridEmbedder
+from app.chunk_embedding.embedder import get_embedder
 from app.utils.config import (
     LOCAL_EMBEDDING_MODEL,
     MONGO_VECTOR_COLLECTION,
@@ -17,7 +17,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-embedder = HybridEmbedder(use_sparse=USE_SPARSE_EMBEDDING, use_colbert=False)
+# Dùng singleton embedder để tránh load model nhiều lần → MemoryError
+embedder = get_embedder(use_sparse=USE_SPARSE_EMBEDDING, use_colbert=False)
 
 def search_knowledge(
     query: str,
