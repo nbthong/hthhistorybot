@@ -4,7 +4,7 @@ from typing import Any, Optional, Iterator
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from app.utils.config import PREFERRED_MODEL, TEXT_GENERATION_CONFIG, ENV_FILE, MODEL_GEN_IMAGE
+from app.utils.config import PREFERRED_MODEL, TEXT_GENERATION_CONFIG, TEXT_GENERATION_CONFIG_STREAM, ENV_FILE, MODEL_GEN_IMAGE
 import base64
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,12 @@ class GeminiKeyManager:
             **kwargs,
         )
 
-    def stream_content(self, contents: Any, **kwargs: Any) -> Iterator[str]:
-        config = kwargs.pop("config", self.generation_config)
+    def stream_content(self, contents: Any, use_stream_config: bool = True, **kwargs: Any) -> Iterator[str]:
+        if use_stream_config:
+            config = kwargs.pop("config", TEXT_GENERATION_CONFIG_STREAM)
+        else:
+            config = kwargs.pop("config", self.generation_config)
+            
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
             contents=contents,

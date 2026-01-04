@@ -4,6 +4,9 @@ from pydantic import BaseModel
 from app.orchestrator.agent import agent_system
 from fastapi.responses import StreamingResponse
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lịch Sử 12 AI Tutor API")
 
@@ -31,7 +34,16 @@ async def root():
 async def chat(request: ChatRequest):
     try:
         user_msg = request.message
+        
+        # Validate input
+        if not user_msg or len(user_msg.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+        
+        if len(user_msg) > 5000:
+            raise HTTPException(status_code=400, detail="Message too long (max 5000 characters)")
+        
         intent = await agent_system.orchestrator(user_msg)
+        
         if "QUIZ" in intent:
             generator = agent_system.quiz_agent_stream(user_msg)
         else:
@@ -41,10 +53,18 @@ async def chat(request: ChatRequest):
             generator,
             media_type="application/x-ndjson",
             headers={
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-transform",
                 "X-Content-Type-Options": "nosniff",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable buffering for nginx/proxies
+                "Content-Type": "application/x-ndjson; charset=utf-8",
             },
         )
 
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Chat endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

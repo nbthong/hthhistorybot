@@ -38,7 +38,13 @@ MODEL_EMBEDDING = "text-embedding-004"
 MODEL_ANSWER = "gemini-2.0-flash"  
 PREFERRED_MODEL = MODEL_ANSWER 
 
-# Generation configuration
+# Generation configuration for streaming (plain text response)
+TEXT_GENERATION_CONFIG_STREAM = types.GenerateContentConfig(
+    temperature=0.5,
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+)
+
+# Generation configuration for non-streaming (JSON response)
 TEXT_GENERATION_CONFIG = types.GenerateContentConfig(
     temperature=0.5,
     response_mime_type="application/json",

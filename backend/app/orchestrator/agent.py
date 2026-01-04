@@ -3,6 +3,7 @@ from typing import AsyncIterable
 import asyncio
 import logging
 import json
+import time
 
 from app.services.key_manager_gemini import key_manager
 from app.orchestrator.retriever import search_knowledge
@@ -18,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 if not key_manager:
     raise RuntimeError("Gemini API keys are not configured on the server.")
+
+# Timeout configuration
+RETRIEVAL_TIMEOUT = 30  # Maximum time for knowledge retrieval (seconds)
+GENERATION_TIMEOUT = 120  # Maximum time for text generation (seconds)
+IMAGE_GENERATION_TIMEOUT = 60  # Maximum time for image generation (seconds)
 
 
 class HistoryAIAgent:
@@ -66,55 +72,170 @@ class HistoryAIAgent:
             return None
 
     async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
-        knowledges = search_knowledge(user_input, use_hybrid=True)
-        context_parts = [f"{k['content_text']}" for k in knowledges]
-        context = "\n\n".join(context_parts)
-
-        enable_image = (os.getenv("ENABLE_IMAGE_GENERATION", "0").strip() == "1")
-        image_future = asyncio.create_task(self._generate_image_task(user_input, context)) if enable_image else None
-        prompt = RAG_ANSWER_PROMPT.format(context=context, user_input=user_input)
-        
-        for chunk_text in self.key_manager.stream_content(prompt):
-            if chunk_text:
-                data = json.dumps({
-                    "type": "text", 
-                    "content": chunk_text
-                }, ensure_ascii=False)
-                yield f"{data}\n" 
-
-        if image_future:
-            image_result = await image_future
-            if image_result:
-                mime_type, image_base64 = image_result
-                data = json.dumps(
-                    {"type": "image", "mime_type": mime_type, "data": image_base64},
-                    ensure_ascii=False,
+        try:
+            yield json.dumps({
+                "type": "status", 
+                "message": "Searching for knowledge..."
+            }, ensure_ascii=False) + "\n"
+            
+            try:
+                knowledges = await asyncio.wait_for(
+                    asyncio.to_thread(search_knowledge, user_input, use_hybrid=True),
+                    timeout=RETRIEVAL_TIMEOUT
                 )
-                yield f"{data}\n"
+            except asyncio.TimeoutError:
+                yield json.dumps({
+                    "type": "error",
+                    "code": "RETRIEVAL_TIMEOUT",
+                    "message": "Searching for knowledge took too long. Please try again."
+                }, ensure_ascii=False) + "\n"
+                return
+            
+            if not knowledges:
+                yield json.dumps({
+                    "type": "error",
+                    "code": "NO_KNOWLEDGE_FOUND",
+                    "message": "No knowledge found in the database."
+                }, ensure_ascii=False) + "\n"
+                return
+            
+            context_parts = [f"{k['content_text']}" for k in knowledges]
+            context = "\n\n".join(context_parts)
+
+            enable_image = (os.getenv("ENABLE_IMAGE_GENERATION", "0").strip() == "1")
+            image_future = None
+            
+            if enable_image:
+                yield json.dumps({
+                    "type": "status",
+                    "message": "Preparing to generate image..."
+                }, ensure_ascii=False) + "\n"
+                image_future = asyncio.create_task(self._generate_image_task(user_input, context))
+            
+            yield json.dumps({
+                "type": "status",
+                "message": "Generating answer..."
+            }, ensure_ascii=False) + "\n"
+            
+            prompt = RAG_ANSWER_PROMPT.format(context=context, user_input=user_input)
+            
+            for chunk_text in self.key_manager.stream_content(prompt, use_stream_config=True):
+                if chunk_text:
+                    data = json.dumps({
+                        "type": "text", 
+                        "content": chunk_text
+                    }, ensure_ascii=False)
+                    yield f"{data}\n"
+            
+            if image_future:
+                yield json.dumps({
+                    "type": "status",
+                    "message": "Generating image..."
+                }, ensure_ascii=False) + "\n"
+                
+                try:
+                    image_result = await asyncio.wait_for(image_future, timeout=IMAGE_GENERATION_TIMEOUT)
+                    if image_result:
+                        mime_type, image_base64 = image_result
+                        data = json.dumps(
+                            {"type": "image", "mime_type": mime_type, "data": image_base64},
+                            ensure_ascii=False,
+                        )
+                        yield f"{data}\n"
+                    else:
+                        yield json.dumps({
+                            "type": "status",
+                            "message": "❌ Unable to generate image"
+                        }, ensure_ascii=False) + "\n"
+                except asyncio.TimeoutError:
+                    yield json.dumps({
+                        "type": "status",
+                        "message": "❌ Generating image took too long, skipping this step"
+                    }, ensure_ascii=False) + "\n"
+                    
+        except asyncio.TimeoutError:
+            yield json.dumps({
+                "type": "error",
+                "code": "TIMEOUT",
+                "message": "Request timed out. Please try again."
+            }, ensure_ascii=False) + "\n"
+        except Exception as e:
+            logger.error(f"RAG agent error: {e}", exc_info=True)
+            yield json.dumps({
+                "type": "error",
+                "code": "INTERNAL_ERROR",
+                "message": f"Error: {str(e)}"
+            }, ensure_ascii=False) + "\n"
 
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
-        knowledges = search_knowledge(user_input, limit=3, use_hybrid=True)
-        
-        context_parts = []
-        for k in knowledges:
-            page_info = f"[Trang {k.get('page_id', '?')} - {k.get('topic', '')}]"
-            context_parts.append(f"{page_info}\n{k['content_text']}")
-        
-        context = "\n\n---\n\n".join(context_parts)
-
-        prompt = QUIZ_GENERATION_PROMPT.format(
-            context=context,
-            user_input=user_input,
-        )
-        
-        for text in self.key_manager.stream_content(prompt):
-            if text:
-                data = json.dumps(
-                    {"type": "text", "content": text},
-                    ensure_ascii=False,
+        try:
+            yield json.dumps({
+                "type": "status",
+                "message": "Searching for documents to generate quiz..."
+            }, ensure_ascii=False) + "\n"
+            
+            # Convert blocking search to async with timeout
+            try:
+                knowledges = await asyncio.wait_for(
+                    asyncio.to_thread(search_knowledge, user_input, limit=3, use_hybrid=True),
+                    timeout=RETRIEVAL_TIMEOUT
                 )
-                yield f"{data}\n"
+            except asyncio.TimeoutError:
+                yield json.dumps({
+                    "type": "error",
+                    "code": "RETRIEVAL_TIMEOUT",
+                    "message": "Searching for documents took too long. Please try again."
+                }, ensure_ascii=False) + "\n"
+                return
+            
+            if not knowledges:
+                yield json.dumps({
+                    "type": "error",
+                    "code": "NO_KNOWLEDGE_FOUND",
+                    "message": "No documents found to generate quiz."
+                }, ensure_ascii=False) + "\n"
+                return
+
+            context_parts = []
+            for k in knowledges:
+                page_info = f"[Trang {k.get('page_id', '?')} - {k.get('topic', '')}]"
+                context_parts.append(f"{page_info}\n{k['content_text']}")
+            
+            context = "\n\n---\n\n".join(context_parts)
+            
+            # Status: Generating quiz
+            yield json.dumps({
+                "type": "status",
+                "message": "Generating quiz..."
+            }, ensure_ascii=False) + "\n"
+
+            prompt = QUIZ_GENERATION_PROMPT.format(
+                context=context,
+                user_input=user_input,
+            )
+            
+            for text in self.key_manager.stream_content(prompt, use_stream_config=True):
+                if text:
+                    data = json.dumps(
+                        {"type": "text", "content": text},
+                        ensure_ascii=False,
+                    )
+                    yield f"{data}\n"
+                    
+        except asyncio.TimeoutError:
+            yield json.dumps({
+                "type": "error",
+                "code": "TIMEOUT",
+                "message": "Request timed out. Please try again."
+            }, ensure_ascii=False) + "\n"
+        except Exception as e:
+            logger.error(f"Quiz agent error: {e}", exc_info=True)
+            yield json.dumps({
+                "type": "error",
+                "code": "INTERNAL_ERROR",
+                "message": f"Error: {str(e)}"
+            }, ensure_ascii=False) + "\n"
 
 
 agent_system = HistoryAIAgent()
