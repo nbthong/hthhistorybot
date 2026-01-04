@@ -4,7 +4,6 @@ from app.chunk_embedding.embedder import HybridEmbedder
 from app.utils.config import (
     LOCAL_EMBEDDING_MODEL,
     MONGO_VECTOR_COLLECTION,
-    MONGO_VECTOR_COLLECTION_NEW,
     VECTOR_TOP_K,
     VECTOR_NUM_CANDIDATES,
     VECTOR_SCORE_THRESHOLD,
@@ -29,7 +28,6 @@ def search_knowledge(
 
     top_k = limit or VECTOR_TOP_K
     candidates = num_candidates or VECTOR_NUM_CANDIDATES
-    # collection = get_collection(MONGO_VECTOR_COLLECTION_NEW)
     collection = get_collection(MONGO_VECTOR_COLLECTION)
     
     # If sparse is not enabled or hybrid is not desired, use dense only

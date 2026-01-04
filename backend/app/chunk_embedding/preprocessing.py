@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.config import OUTPUT_JSON_CHUNK_EMBEDDING_TEST, OUTPUT_JSON_CHUNK_EMBEDDING, OUTPUT_JSON_DATA, OUTPUT_JSON_DATA_TEST, CHUNK_SIZE, CHUNK_OVERLAP
+from app.utils.config import OUTPUT_JSON_CHUNK_EMBEDDING, OUTPUT_JSON_DATA, CHUNK_SIZE, CHUNK_OVERLAP
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +204,7 @@ def save_merge_content_json(merged: Dict[str, Any], output_path: str | Path) -> 
 def run(
     *,
     history_db_path: str | Path = OUTPUT_JSON_DATA,
-    merge_output_path: str | Path = OUTPUT_JSON_CHUNK_EMBEDDING_TEST,
+    merge_output_path: str | Path = OUTPUT_JSON_CHUNK_EMBEDDING,
     include_non_content_pages: bool = False,
 ) -> Dict[str, Any]:
 

@@ -25,11 +25,9 @@ EXTRACT_DATA_DIR = os.path.join(PROJECT_ROOT, "app", "extract_data")
 
 # Output JSON file path extract data
 OUTPUT_JSON_DATA = os.path.join(EXTRACT_DATA_DIR, "history_ultimate_db.json")
-OUTPUT_JSON_DATA_TEST = os.path.join(EXTRACT_DATA_DIR, "test_structure_data_new.json")
 
 # Output JSON file path chunk embedding
 OUTPUT_JSON_CHUNK_EMBEDDING = os.path.join(EXTRACT_DATA_DIR, "merge_content.json")
-OUTPUT_JSON_CHUNK_EMBEDDING_TEST = os.path.join(EXTRACT_DATA_DIR, "merge_content_test.json")
 
 
 # ============================================================================
@@ -92,10 +90,7 @@ SAVE_BATCH_SIZE = 10  # Save to file every N pages
 
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
-MONGO_COLLECTION_NAME_TEST = "knowledge_base_test"
-
 MONGO_VECTOR_COLLECTION = "knowledge_vectors"
-MONGO_VECTOR_COLLECTION_NEW = "knowledge_vectors_new"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"

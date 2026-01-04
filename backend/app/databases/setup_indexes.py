@@ -1,7 +1,7 @@
 import logging
 from app.databases.database import ensure_kb_indexes, get_database
 from app.databases.vector_store import ensure_vector_indexes
-from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_NEW
+from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,8 +16,8 @@ def create_indexes():
     logger.info("✅ KB indexes ensured")
     
     # Collection knowledge_vectors
-    logger.info(f"\nSetting up indexes for '{MONGO_VECTOR_COLLECTION_NEW}'...")
-    ensure_vector_indexes(MONGO_VECTOR_COLLECTION_NEW)
+    logger.info(f"\nSetting up indexes for '{MONGO_VECTOR_COLLECTION}'...")
+    ensure_vector_indexes(MONGO_VECTOR_COLLECTION)
     logger.info("✅ Vector indexes ensured")
     
     # Vector Search Index (only MongoDB Atlas supported)
@@ -35,7 +35,7 @@ def list_indexes():
     logger.info("CURRENT INDEXES")
     logger.info("="*60)
     
-    for coll_name in [MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_NEW]:
+    for coll_name in [MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION]:
         logger.info(f"\nCollection: {coll_name}")
         collection = db[coll_name]
         indexes = list(collection.list_indexes())

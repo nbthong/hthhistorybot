@@ -10,7 +10,7 @@ from app.utils.config import (
     LOCAL_EMBEDDING_MODEL,
     MONGO_ATLAS_VECTOR_INDEX_NAME,
     MONGO_ATLAS_VECTOR_PATH,
-    MONGO_VECTOR_COLLECTION_NEW,
+    MONGO_VECTOR_COLLECTION,
     USE_EMBEDDING_MODEL_FILTER,
 )
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_vector_collection(name: str | None = None) -> Collection:
-    return get_collection(name or MONGO_VECTOR_COLLECTION_NEW)
+    return get_collection(name or MONGO_VECTOR_COLLECTION)
 
 
 def ensure_vector_indexes(collection_name: str | None = None) -> None:

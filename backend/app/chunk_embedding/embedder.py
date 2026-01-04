@@ -10,7 +10,6 @@ from app.utils.config import (
     USE_SPARSE_EMBEDDING,
     USE_COLBERT_EMBEDDING,
     MONGO_VECTOR_COLLECTION,
-    OUTPUT_JSON_CHUNK_EMBEDDING_TEST,
     OUTPUT_JSON_CHUNK_EMBEDDING,
     EMBED_BATCH_SIZE,
     MONGO_BULK_WRITE_BATCH_SIZE,
@@ -276,13 +275,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     # Read merged lessons from file
-    merge_file = OUTPUT_JSON_CHUNK_EMBEDDING_TEST
+    merge_file = OUTPUT_JSON_CHUNK_EMBEDDING
     if not merge_file.exists():
-        logger.error(f"File {OUTPUT_JSON_CHUNK_EMBEDDING_TEST} does not exist: {merge_file}")
-        logger.info(f"Run preprocessing.py before to create {OUTPUT_JSON_CHUNK_EMBEDDING_TEST}")
+        logger.error(f"File {OUTPUT_JSON_CHUNK_EMBEDDING} does not exist: {merge_file}")
+        logger.info(f"Run preprocessing.py before to create {OUTPUT_JSON_CHUNK_EMBEDDING}")
         exit(1)
     
-    with open(OUTPUT_JSON_CHUNK_EMBEDDING_TEST, "r", encoding="utf-8") as f:
+    with open(OUTPUT_JSON_CHUNK_EMBEDDING, "r", encoding="utf-8") as f:
         merged = json.load(f)
     
     # Embed and save to MongoDB

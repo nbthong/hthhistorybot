@@ -19,7 +19,7 @@ from app.utils.config import (
     ENV_FILE,
     MODEL_EXTRACT,
     EXTRACT_GENERATION_CONFIG,
-    MONGO_COLLECTION_NAME_TEST,
+    MONGO_COLLECTION_NAME,
     SAVE_BATCH_SIZE,
 )
 from app.databases.database import get_collection
@@ -72,7 +72,7 @@ def _get_context_from_record(record: Dict[str, Any]) -> Tuple[str, str]:
 def _save_record(record: Dict[str, Any], unique_id: str, page_num: int, local_db: list, existing_records: Dict[str, Any]) -> None:
     """Save record to MongoDB and local_db."""
     try:
-        get_collection(MONGO_COLLECTION_NAME_TEST).update_one(
+        get_collection(MONGO_COLLECTION_NAME).update_one(
             {"doc_id": unique_id}, {"$set": record}, upsert=True
         )
     except Exception as e:
