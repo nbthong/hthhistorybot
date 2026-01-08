@@ -4,6 +4,7 @@ import asyncio
 import logging
 import json
 from collections import deque
+from typing import List, Dict
 
 from app.services.key_manager_gemini import key_manager
 from app.orchestrator.retriever import search_knowledge
@@ -14,6 +15,7 @@ from app.utils.prompts import (
     IMAGE_GENERATION_PROMPT,
     GENERAL_CHAT_PROMPT,
     QUERY_REFINER_PROMPT,
+    RERANKER_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,101 +76,122 @@ class HistoryAIAgent:
             logger.error(f"❌ Async image task error: {e}")
             return None
 
+    async def _condense_question(self, user_input: str) -> str:
+        history_str = self._get_history_string()
+        if not self.memory_window:
+            return user_input
+
+        condense_prompt = f"""
+        Bạn là một trợ lý phân tích ngữ cảnh. Dựa trên lịch sử trò chuyện và câu hỏi mới, 
+        hãy tạo ra một câu hỏi tìm kiếm (Search Query) độc lập, đầy đủ thông tin để tra cứu trong sách giáo khoa.
+        
+        LỊCH SỬ:
+        {history_str}
+        
+        CÂU HỎI MỚI: '{user_input}'
+        
+        YÊU CẦU:
+        - Nếu câu hỏi mới là 'chi tiết hơn', 'tiếp đi', 'tại sao'... hãy bổ sung tên sự kiện/nhân vật đang được nói tới.
+        - Trả về DUY NHẤT nội dung câu hỏi đã cô đọng. Không giải thích.
+        """
+        try:
+            res = await asyncio.to_thread(self.key_manager.generate_content, condense_prompt)
+            standalone_query = res.text.strip()
+            logger.info(f"🔄 Context Logic: '{user_input}' -> '{standalone_query}'")
+            return standalone_query
+        except Exception:
+            return user_input
+
     async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
-            clean_query  = await self._refine_user_query(user_input)
-            chat_history_str = self._get_history_string()
-
-            knowledges = await asyncio.to_thread(search_knowledge, clean_query, use_hybrid=True)
-            context = "\n\n".join([k['content_text'] for k in knowledges])
+            yield json.dumps({"type": "status", "message": "Processing..."}, ensure_ascii=False) + "\n"
+            search_query = await self._condense_question(user_input)
+            clean_query = await self._refine_user_query(search_query)
             
+            image_keywords = ["trận chiến", "diễn biến", "cuộc chiến", "diễn ra", "chiến dịch", "khởi nghĩa", "trận đánh"]
+            force_gen_image = any(k in clean_query.lower() for k in image_keywords)
+
+            knowledges = await asyncio.to_thread(search_knowledge, clean_query, limit=15, use_hybrid=True)
+            if not knowledges:
+                yield json.dumps({"type": "text", "content": "Thầy không tìm thấy tư liệu này."}, ensure_ascii=False) + "\n"
+                return
+
+            best_docs = await self._rerank_knowledge(clean_query, knowledges)
+            context = "\n\n---\n\n".join([f"[Trang {d.get('page_id')}]: {d['content_text']}" for d in best_docs])
+
             prompt = RAG_ANSWER_PROMPT.format(
                 context=context,
-                chat_history=chat_history_str,
+                chat_history=self._get_history_string(),
                 user_input=user_input
             )
-            
+
             full_response = ""
             for chunk_text in self.key_manager.stream_content(prompt, use_stream_config=True):
                 if chunk_text:
                     full_response += chunk_text
                     yield json.dumps({"type": "text", "content": chunk_text}, ensure_ascii=False) + "\n"
+
+            word_count = len(full_response.split())
             
+            should_gen_image = force_gen_image or (word_count > 50)
+
+            if should_gen_image and os.getenv("ENABLE_IMAGE_GENERATION") == "1":
+                yield json.dumps({
+                    "type": "status", 
+                    "message": "🖼️ Bài giảng dài và sinh động, thầy đang vẽ hình minh họa cho em..." if word_count > 50 else "🖼️ Đang tạo hình ảnh minh họa cho diễn biến này..."
+                }, ensure_ascii=False) + "\n"
+                
+                image_result = await self._generate_image_task(clean_query, context)
+                
+                if image_result:
+                    mime_type, image_base64 = image_result
+                    yield json.dumps({
+                        "type": "image", 
+                        "mime_type": mime_type, 
+                        "data": image_base64
+                    }, ensure_ascii=False) + "\n"
+
             self.memory_window.append({"role": "Học sinh", "content": user_input})
             self.memory_window.append({"role": "Giáo viên", "content": full_response})
 
         except Exception as e:
-            logger.error(f"RAG agent error: {e}")
-            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+            logger.error(f"Error: {e}")
+            yield json.dumps({"type": "error", "message": "System error."}, ensure_ascii=False) + "\n"
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
-            yield json.dumps({
-                "type": "status",
-                "message": "Searching for documents to generate quiz..."
-            }, ensure_ascii=False) + "\n"
-            
-            # Convert blocking search to async with timeout
-            try:
-                knowledges = await asyncio.wait_for(
-                    asyncio.to_thread(search_knowledge, user_input, limit=3, use_hybrid=True),
-                    timeout=RETRIEVAL_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                yield json.dumps({
-                    "type": "error",
-                    "code": "RETRIEVAL_TIMEOUT",
-                    "message": "Searching for documents took too long. Please try again."
-                }, ensure_ascii=False) + "\n"
-                return
-            
+            yield json.dumps({"type": "status", "message": "Intent: Quiz"}, ensure_ascii=False) + "\n"
+            search_query = await self._condense_question(user_input)
+
+            knowledges = await asyncio.to_thread(
+                search_knowledge, search_query, limit=5, use_hybrid=True
+            )
+
             if not knowledges:
-                yield json.dumps({
-                    "type": "error",
-                    "code": "NO_KNOWLEDGE_FOUND",
-                    "message": "No documents found to generate quiz."
-                }, ensure_ascii=False) + "\n"
+                yield json.dumps({"type": "error", "message": "Not found relevant knowledge."}, ensure_ascii=False) + "\n"
                 return
 
-            context_parts = []
-            for k in knowledges:
-                page_info = f"[Trang {k.get('page_id', '?')} - {k.get('topic', '')}]"
-                context_parts.append(f"{page_info}\n{k['content_text']}")
-            
-            context = "\n\n---\n\n".join(context_parts)
-            
-            # Status: Generating quiz
-            yield json.dumps({
-                "type": "status",
-                "message": "Generating quiz..."
-            }, ensure_ascii=False) + "\n"
+            context = "\n\n".join([f"[Trang {k.get('page_id')}]: {k['content_text']}" for k in knowledges])
+
+            yield json.dumps({"type": "status", "message": "Đang soạn câu hỏi trắc nghiệm..."}, ensure_ascii=False) + "\n"
 
             prompt = QUIZ_GENERATION_PROMPT.format(
                 context=context,
-                user_input=user_input,
+                user_input=search_query
             )
-            
+
+            full_quiz_content = ""
             for text in self.key_manager.stream_content(prompt, use_stream_config=True):
                 if text:
-                    data = json.dumps(
-                        {"type": "text", "content": text},
-                        ensure_ascii=False,
-                    )
-                    yield f"{data}\n"
-                    
-        except asyncio.TimeoutError:
-            yield json.dumps({
-                "type": "error",
-                "code": "TIMEOUT",
-                "message": "Request timed out. Please try again."
-            }, ensure_ascii=False) + "\n"
+                    full_quiz_content += text
+                    yield json.dumps({"type": "text", "content": text}, ensure_ascii=False) + "\n"
+            
+            self.memory_window.append({"role": "Học sinh", "content": f"Yêu cầu làm Quiz về {search_query}"})
+            self.memory_window.append({"role": "Giáo viên", "content": "[Đã gửi bộ câu hỏi trắc nghiệm]"})
+
         except Exception as e:
             logger.error(f"Quiz agent error: {e}", exc_info=True)
-            yield json.dumps({
-                "type": "error",
-                "code": "INTERNAL_ERROR",
-                "message": f"Error: {str(e)}"
-            }, ensure_ascii=False) + "\n"
+            yield json.dumps({"type": "error", "message": f"Error generating quiz: {str(e)}"}, ensure_ascii=False) + "\n"
 
     async def chat_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
@@ -206,5 +229,30 @@ class HistoryAIAgent:
         except Exception as e:
             logger.error(f"Error refining query: {e}")
             return user_input
+
+    async def _rerank_knowledge(self, user_input: str, knowledges: List[Dict]) -> List[Dict]:
+        if not knowledges:
+            return []
+            
+        docs_for_ai = ""
+        for i, k in enumerate(knowledges):
+            docs_for_ai += f"ID {i}: {k['content_text'][:300]}...\n\n"
+
+        prompt = RERANKER_PROMPT.format(user_input=user_input, documents=docs_for_ai)
+        
+        try:
+            response = await asyncio.to_thread(self.key_manager.generate_content, prompt)
+            selected_data = json.loads(response.text)
+            selected_ids = selected_data.get("selected_ids", [])
+            
+            filtered_knowledges = [knowledges[i] for i in selected_ids if i < len(knowledges)]
+            
+            logger.info(f"Reranker: Giảm từ {len(knowledges)} đoạn xuống còn {len(filtered_knowledges)} đoạn chất lượng.")
+            return filtered_knowledges[:3] 
+        except Exception as e:
+            logger.error(f"Reranking error: {e}")
+            return knowledges[:3] 
+
+
 
 agent_system = HistoryAIAgent()
