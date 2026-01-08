@@ -3,7 +3,7 @@ from typing import AsyncIterable
 import asyncio
 import logging
 import json
-import time
+from collections import deque
 
 from app.services.key_manager_gemini import key_manager
 from app.orchestrator.retriever import search_knowledge
@@ -12,8 +12,9 @@ from app.utils.prompts import (
     RAG_ANSWER_PROMPT,
     QUIZ_GENERATION_PROMPT,
     IMAGE_GENERATION_PROMPT,
+    GENERAL_CHAT_PROMPT,
+    QUERY_REFINER_PROMPT,
 )
-from app.utils.config import TEXT_GENERATION_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ IMAGE_GENERATION_TIMEOUT = 60  # Maximum time for image generation (seconds)
 class HistoryAIAgent:
     def __init__(self) -> None:
         self.key_manager = key_manager
+        self.memory_window = deque(maxlen=6) 
 
     def _infer_intent_fast(self, user_input: str) -> str | None:
         s = user_input.lower()
@@ -46,13 +48,14 @@ class HistoryAIAgent:
             return "QUIZ"
         return None
 
-    async def orchestrator(self, user_input: str) -> str:
-        if fast := self._infer_intent_fast(user_input):
-            return fast
-
+    async def orchestrator(self, user_input: str) -> dict:
         prompt = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input)
         response = self.key_manager.generate_content(prompt)
-        return (response.text or "").strip().upper()
+        try:
+            return json.loads(response.text)
+        except Exception as e:
+            logger.error(f"❌ Orchestrator error: {e}")
+            return {"intent": "LEARN", "need_image": False}
 
     async def _generate_image_task(self, user_input: str, context_text: str) -> tuple[str, str] | None:
         try:
@@ -73,100 +76,30 @@ class HistoryAIAgent:
 
     async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
-            yield json.dumps({
-                "type": "status", 
-                "message": "Searching for knowledge..."
-            }, ensure_ascii=False) + "\n"
-            
-            try:
-                knowledges = await asyncio.wait_for(
-                    asyncio.to_thread(search_knowledge, user_input, use_hybrid=True),
-                    timeout=RETRIEVAL_TIMEOUT
-                )
-            except asyncio.TimeoutError:
-                yield json.dumps({
-                    "type": "error",
-                    "code": "RETRIEVAL_TIMEOUT",
-                    "message": "Searching for knowledge took too long. Please try again."
-                }, ensure_ascii=False) + "\n"
-                return
-            
-            if not knowledges:
-                yield json.dumps({
-                    "type": "error",
-                    "code": "NO_KNOWLEDGE_FOUND",
-                    "message": "No knowledge found in the database."
-                }, ensure_ascii=False) + "\n"
-                return
-            
-            context_parts = [f"{k['content_text']}" for k in knowledges]
-            context = "\n\n".join(context_parts)
+            clean_query  = await self._refine_user_query(user_input)
+            chat_history_str = self._get_history_string()
 
-            enable_image = (os.getenv("ENABLE_IMAGE_GENERATION", "0").strip() == "1")
-            image_future = None
+            knowledges = await asyncio.to_thread(search_knowledge, clean_query, use_hybrid=True)
+            context = "\n\n".join([k['content_text'] for k in knowledges])
             
-            if enable_image:
-                yield json.dumps({
-                    "type": "status",
-                    "message": "Preparing to generate image..."
-                }, ensure_ascii=False) + "\n"
-                image_future = asyncio.create_task(self._generate_image_task(user_input, context))
+            prompt = RAG_ANSWER_PROMPT.format(
+                context=context,
+                chat_history=chat_history_str,
+                user_input=user_input
+            )
             
-            yield json.dumps({
-                "type": "status",
-                "message": "Generating answer..."
-            }, ensure_ascii=False) + "\n"
-            
-            prompt = RAG_ANSWER_PROMPT.format(context=context, user_input=user_input)
-            
+            full_response = ""
             for chunk_text in self.key_manager.stream_content(prompt, use_stream_config=True):
                 if chunk_text:
-                    data = json.dumps({
-                        "type": "text", 
-                        "content": chunk_text
-                    }, ensure_ascii=False)
-                    yield f"{data}\n"
+                    full_response += chunk_text
+                    yield json.dumps({"type": "text", "content": chunk_text}, ensure_ascii=False) + "\n"
             
-            if image_future:
-                yield json.dumps({
-                    "type": "status",
-                    "message": "Generating image..."
-                }, ensure_ascii=False) + "\n"
-                
-                try:
-                    image_result = await asyncio.wait_for(image_future, timeout=IMAGE_GENERATION_TIMEOUT)
-                    if image_result:
-                        mime_type, image_base64 = image_result
-                        data = json.dumps(
-                            {"type": "image", "mime_type": mime_type, "data": image_base64},
-                            ensure_ascii=False,
-                        )
-                        yield f"{data}\n"
-                    else:
-                        yield json.dumps({
-                            "type": "status",
-                            "message": "❌ Unable to generate image"
-                        }, ensure_ascii=False) + "\n"
-                except asyncio.TimeoutError:
-                    yield json.dumps({
-                        "type": "status",
-                        "message": "❌ Generating image took too long, skipping this step"
-                    }, ensure_ascii=False) + "\n"
-                    
-        except asyncio.TimeoutError:
-            yield json.dumps({
-                "type": "error",
-                "code": "TIMEOUT",
-                "message": "Request timed out. Please try again."
-            }, ensure_ascii=False) + "\n"
-        except Exception as e:
-            logger.error(f"RAG agent error: {e}", exc_info=True)
-            yield json.dumps({
-                "type": "error",
-                "code": "INTERNAL_ERROR",
-                "message": f"Error: {str(e)}"
-            }, ensure_ascii=False) + "\n"
+            self.memory_window.append({"role": "Học sinh", "content": user_input})
+            self.memory_window.append({"role": "Giáo viên", "content": full_response})
 
+        except Exception as e:
+            logger.error(f"RAG agent error: {e}")
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
@@ -237,5 +170,41 @@ class HistoryAIAgent:
                 "message": f"Error: {str(e)}"
             }, ensure_ascii=False) + "\n"
 
+    async def chat_agent_stream(self, user_input: str) -> AsyncIterable[str]:
+        try:
+            yield json.dumps({
+                "type": "status", 
+                "message": "Answering..."
+            }, ensure_ascii=False) + "\n"
+            
+            prompt = GENERAL_CHAT_PROMPT.format(user_input=user_input)
+            
+            for chunk_text in self.key_manager.stream_content(prompt, use_stream_config=True):
+                if chunk_text:
+                    data = json.dumps({
+                        "type": "text", 
+                        "content": chunk_text
+                    }, ensure_ascii=False)
+                    yield f"{data}\n"
+                    
+        except Exception as e:
+            logger.error(f"Chat agent error: {e}")
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+    def _get_history_string(self) -> str:
+        if not self.memory_window:
+            return "No chat history yet."
+        return "\n".join([f"{m['role']}: {m['content']}" for m in self.memory_window])
+
+    async def _refine_user_query(self, user_input: str) -> str:
+        try:
+            prompt = QUERY_REFINER_PROMPT.format(user_input=user_input)
+            response = await asyncio.to_thread(self.key_manager.generate_content, prompt)
+            refined_query = response.text.strip()
+            logger.info(f"🔍 Refined Query: '{user_input}' -> '{refined_query}'")
+            return refined_query
+        except Exception as e:
+            logger.error(f"Error refining query: {e}")
+            return user_input
 
 agent_system = HistoryAIAgent()

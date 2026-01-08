@@ -90,6 +90,7 @@ SAVE_BATCH_SIZE = 10  # Save to file every N pages
 # MongoDB Configuration
 MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
+MONGO_HISTORY_COLLECTION = "chat_history"
 MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"

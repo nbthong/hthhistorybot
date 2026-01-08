@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Lịch Sử 12 AI Tutor API")
+app = FastAPI(title="Lịch Sử 10, 11, 12 AI Tutor API")
 
 def _parse_cors_origins() -> list[str]:
     raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
@@ -44,9 +44,11 @@ async def chat(request: ChatRequest):
         
         intent = await agent_system.orchestrator(user_msg)
         
-        if "QUIZ" in intent:
+        if intent == "CHAT":
+            generator = agent_system.chat_agent_stream(user_msg)
+        elif intent == "QUIZ":
             generator = agent_system.quiz_agent_stream(user_msg)
-        else:
+        else: 
             generator = agent_system.rag_agent_stream(user_msg)
             
         return StreamingResponse(
@@ -56,7 +58,7 @@ async def chat(request: ChatRequest):
                 "Cache-Control": "no-cache, no-transform",
                 "X-Content-Type-Options": "nosniff",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # Disable buffering for nginx/proxies
+                "X-Accel-Buffering": "no", 
                 "Content-Type": "application/x-ndjson; charset=utf-8",
             },
         )
