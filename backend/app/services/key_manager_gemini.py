@@ -14,44 +14,26 @@ load_dotenv(ENV_FILE)
 API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 
 class GeminiKeyManager:
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        model_name: Optional[str] = None,
-        generation_config: Optional[dict[str, Any]] = None,
-    ):
+    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None, generation_config: Optional[dict[str, Any]] = None, stream_config: Optional[dict[str, Any]] = None):
         self.api_key: str = api_key or API_KEY
-        if not self.api_key:
-            raise ValueError("API key cannot be empty!")
-
         self.model_name: str = model_name or PREFERRED_MODEL
-        if generation_config is None:
-            self.generation_config: types.GenerateContentConfig = TEXT_GENERATION_CONFIG
-        elif isinstance(generation_config, types.GenerateContentConfig):
-            self.generation_config = generation_config
-        else:
-            self.generation_config = types.GenerateContentConfig(**generation_config)
+        self.generation_config: types.GenerateContentConfig = generation_config or TEXT_GENERATION_CONFIG
+        self.stream_config: types.GenerateContentConfig = stream_config or TEXT_GENERATION_CONFIG_STREAM
         self.client = genai.Client(api_key=self.api_key)
 
     def generate_content(self, contents: Any, **kwargs: Any):
-        config = kwargs.pop("config", self.generation_config)
         return self.client.models.generate_content(
             model=self.model_name,
             contents=contents,
-            config=config,
+            config=self.generation_config,
             **kwargs,
         )
 
     def stream_content(self, contents: Any, use_stream_config: bool = True, **kwargs: Any) -> Iterator[str]:
-        if use_stream_config:
-            config = kwargs.pop("config", TEXT_GENERATION_CONFIG_STREAM)
-        else:
-            config = kwargs.pop("config", self.generation_config)
-            
         for chunk in self.client.models.generate_content_stream(
             model=self.model_name,
             contents=contents,
-            config=config,
+            config=self.stream_config,
             **kwargs,
         ):
             text = getattr(chunk, "text", None)

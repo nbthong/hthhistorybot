@@ -16,48 +16,27 @@ from app.utils.prompts import (
     GENERAL_CHAT_PROMPT,
     QUERY_REFINER_PROMPT,
     RERANKER_PROMPT,
+    CONDENSE_PROMPT,
 )
+from app.utils.config import LIMIT_WORD_COUNT_GENERATE_IMAGE
 
 logger = logging.getLogger(__name__)
-
-if not key_manager:
-    raise RuntimeError("Gemini API keys are not configured on the server.")
-
-# Timeout configuration
-RETRIEVAL_TIMEOUT = 30  # Maximum time for knowledge retrieval (seconds)
-GENERATION_TIMEOUT = 120  # Maximum time for text generation (seconds)
-IMAGE_GENERATION_TIMEOUT = 60  # Maximum time for image generation (seconds)
-
 
 class HistoryAIAgent:
     def __init__(self) -> None:
         self.key_manager = key_manager
         self.memory_window = deque(maxlen=6) 
+        self.sessions_memory: Dict[str, deque] = {}
 
-    def _infer_intent_fast(self, user_input: str) -> str | None:
-        s = user_input.lower()
-        quiz_keywords = [
-            "quiz",
-            "trắc nghiệm",
-            "câu hỏi",
-            "đề",
-            "bài tập",
-            "kiểm tra",
-            "luyện tập",
-            "đáp án",
-        ]
-        if any(k in s for k in quiz_keywords):
-            return "QUIZ"
-        return None
+    def _get_session_memory(self, session_id: str) -> deque:
+        if session_id not in self.sessions_memory:
+            self.sessions_memory[session_id] = deque(maxlen=6)
+        return self.sessions_memory[session_id] 
 
     async def orchestrator(self, user_input: str) -> dict:
         prompt = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input)
         response = self.key_manager.generate_content(prompt)
-        try:
-            return json.loads(response.text)
-        except Exception as e:
-            logger.error(f"❌ Orchestrator error: {e}")
-            return {"intent": "LEARN", "need_image": False}
+        return json.loads(response.text)
 
     async def _generate_image_task(self, user_input: str, context_text: str) -> tuple[str, str] | None:
         try:
@@ -76,24 +55,12 @@ class HistoryAIAgent:
             logger.error(f"❌ Async image task error: {e}")
             return None
 
-    async def _condense_question(self, user_input: str) -> str:
-        history_str = self._get_history_string()
-        if not self.memory_window:
+    async def _condense_question(self, user_input: str, session_id: str = "default_user") -> str:
+        history_str = self._get_history_string(session_id)
+        if not history_str:
             return user_input
 
-        condense_prompt = f"""
-        Bạn là một trợ lý phân tích ngữ cảnh. Dựa trên lịch sử trò chuyện và câu hỏi mới, 
-        hãy tạo ra một câu hỏi tìm kiếm (Search Query) độc lập, đầy đủ thông tin để tra cứu trong sách giáo khoa.
-        
-        LỊCH SỬ:
-        {history_str}
-        
-        CÂU HỎI MỚI: '{user_input}'
-        
-        YÊU CẦU:
-        - Nếu câu hỏi mới là 'chi tiết hơn', 'tiếp đi', 'tại sao'... hãy bổ sung tên sự kiện/nhân vật đang được nói tới.
-        - Trả về DUY NHẤT nội dung câu hỏi đã cô đọng. Không giải thích.
-        """
+        condense_prompt = CONDENSE_PROMPT.format(history_str=history_str, user_input=user_input)
         try:
             res = await asyncio.to_thread(self.key_manager.generate_content, condense_prompt)
             standalone_query = res.text.strip()
@@ -102,18 +69,24 @@ class HistoryAIAgent:
         except Exception:
             return user_input
 
-    async def rag_agent_stream(self, user_input: str) -> AsyncIterable[str]:
-        try:
-            yield json.dumps({"type": "status", "message": "Processing..."}, ensure_ascii=False) + "\n"
-            search_query = await self._condense_question(user_input)
-            clean_query = await self._refine_user_query(search_query)
-            
-            image_keywords = ["trận chiến", "diễn biến", "cuộc chiến", "diễn ra", "chiến dịch", "khởi nghĩa", "trận đánh"]
-            force_gen_image = any(k in clean_query.lower() for k in image_keywords)
+    def _get_history_string(self, session_id: str = "default_user") -> str:
+        mem = self._get_session_memory(session_id)
+        if not mem:
+            return "Chưa có lịch sử trò chuyện."
+        return "\n".join([f"{m['role']}: {m['content']}" for m in mem])
 
+    async def rag_agent_stream(self, user_input: str, session_id: str = "default_user") -> AsyncIterable[str]:
+        try:
+            yield json.dumps({"type": "status", "message": "🔍 Thầy đang tìm tài liệu cho em..."}, ensure_ascii=False) + "\n"
+            history_str = self._get_history_string(session_id)
+            search_query = await self._condense_question(user_input, session_id)
+            clean_query = await self._refine_user_query(search_query)
+            image_keywords = ["trận chiến", "diễn biến", "cuộc chiến", "diễn ra", "chiến dịch", "khởi nghĩa", "trận đánh", ]
+            force_gen_image = any(k in clean_query.lower() for k in image_keywords)
             knowledges = await asyncio.to_thread(search_knowledge, clean_query, limit=15, use_hybrid=True)
+
             if not knowledges:
-                yield json.dumps({"type": "text", "content": "Thầy không tìm thấy tư liệu này."}, ensure_ascii=False) + "\n"
+                yield json.dumps({"type": "text", "content": "🔍 Thầy không tìm thấy tư liệu này."}, ensure_ascii=False) + "\n"
                 return
 
             best_docs = await self._rerank_knowledge(clean_query, knowledges)
@@ -121,7 +94,7 @@ class HistoryAIAgent:
 
             prompt = RAG_ANSWER_PROMPT.format(
                 context=context,
-                chat_history=self._get_history_string(),
+                chat_history=history_str,
                 user_input=user_input
             )
 
@@ -133,12 +106,12 @@ class HistoryAIAgent:
 
             word_count = len(full_response.split())
             
-            should_gen_image = force_gen_image or (word_count > 50)
+            should_gen_image = force_gen_image or (word_count > LIMIT_WORD_COUNT_GENERATE_IMAGE)
 
             if should_gen_image and os.getenv("ENABLE_IMAGE_GENERATION") == "1":
                 yield json.dumps({
                     "type": "status", 
-                    "message": "🖼️ Bài giảng dài và sinh động, thầy đang vẽ hình minh họa cho em..." if word_count > 50 else "🖼️ Đang tạo hình ảnh minh họa cho diễn biến này..."
+                    "message": "🖼️ Bài giảng dài và sinh động nên thầy đang vẽ hình minh họa cho em..." if word_count > LIMIT_WORD_COUNT_GENERATE_IMAGE else "🖼️ Thầy đang tạo hình ảnh minh họa cho diễn biến này..."
                 }, ensure_ascii=False) + "\n"
                 
                 image_result = await self._generate_image_task(clean_query, context)
@@ -151,8 +124,9 @@ class HistoryAIAgent:
                         "data": image_base64
                     }, ensure_ascii=False) + "\n"
 
-            self.memory_window.append({"role": "Học sinh", "content": user_input})
-            self.memory_window.append({"role": "Giáo viên", "content": full_response})
+            mem = self._get_session_memory(session_id)
+            mem.append({"role": "Học sinh", "content": user_input})
+            mem.append({"role": "Giáo viên", "content": full_response})
 
         except Exception as e:
             logger.error(f"Error: {e}")
@@ -160,7 +134,7 @@ class HistoryAIAgent:
 
     async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
         try:
-            yield json.dumps({"type": "status", "message": "Intent: Quiz"}, ensure_ascii=False) + "\n"
+            yield json.dumps({"type": "status", "message": "🔍 Thầy đang tìm tài liệu cho em..."}, ensure_ascii=False) + "\n"
             search_query = await self._condense_question(user_input)
 
             knowledges = await asyncio.to_thread(
@@ -168,12 +142,12 @@ class HistoryAIAgent:
             )
 
             if not knowledges:
-                yield json.dumps({"type": "error", "message": "Not found relevant knowledge."}, ensure_ascii=False) + "\n"
+                yield json.dumps({"type": "error", "message": "🔍 Thầy không tìm thấy tài liệu này."}, ensure_ascii=False) + "\n"
                 return
 
             context = "\n\n".join([f"[Trang {k.get('page_id')}]: {k['content_text']}" for k in knowledges])
 
-            yield json.dumps({"type": "status", "message": "Đang soạn câu hỏi trắc nghiệm..."}, ensure_ascii=False) + "\n"
+            yield json.dumps({"type": "status", "message": "📝 Thầy đang tạo câu hỏi trắc nghiệm cho em..."}, ensure_ascii=False) + "\n"
 
             prompt = QUIZ_GENERATION_PROMPT.format(
                 context=context,
@@ -193,12 +167,9 @@ class HistoryAIAgent:
             logger.error(f"Quiz agent error: {e}", exc_info=True)
             yield json.dumps({"type": "error", "message": f"Error generating quiz: {str(e)}"}, ensure_ascii=False) + "\n"
 
-    async def chat_agent_stream(self, user_input: str) -> AsyncIterable[str]:
+    async def chat_agent_stream(self, user_input: str, session_id: str = "default_user") -> AsyncIterable[str]:
         try:
-            yield json.dumps({
-                "type": "status", 
-                "message": "Answering..."
-            }, ensure_ascii=False) + "\n"
+            yield json.dumps({"type": "status", "message": "🔍 Thầy đang trả lời câu hỏi cho em..."}, ensure_ascii=False) + "\n"
             
             prompt = GENERAL_CHAT_PROMPT.format(user_input=user_input)
             
@@ -213,11 +184,6 @@ class HistoryAIAgent:
         except Exception as e:
             logger.error(f"Chat agent error: {e}")
             yield json.dumps({"type": "error", "message": str(e)}) + "\n"
-
-    def _get_history_string(self) -> str:
-        if not self.memory_window:
-            return "No chat history yet."
-        return "\n".join([f"{m['role']}: {m['content']}" for m in self.memory_window])
 
     async def _refine_user_query(self, user_input: str) -> str:
         try:
@@ -252,7 +218,5 @@ class HistoryAIAgent:
         except Exception as e:
             logger.error(f"Reranking error: {e}")
             return knowledges[:3] 
-
-
 
 agent_system = HistoryAIAgent()

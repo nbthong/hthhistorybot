@@ -5,6 +5,7 @@ from app.orchestrator.agent import agent_system
 from fastapi.responses import StreamingResponse
 import os
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = "default_user"
 
 @app.get("/")
 async def root():
@@ -32,41 +34,46 @@ async def root():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
+    user_msg = request.message
+    session_id = request.session_id
+
+    if not user_msg or not user_msg.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    if len(user_msg) > 5000:
+        raise HTTPException(status_code=400, detail="Message too long (max 5000 characters)",)
+    
     try:
-        user_msg = request.message
-        
-        # Validate input
-        if not user_msg or len(user_msg.strip()) == 0:
-            raise HTTPException(status_code=400, detail="Message cannot be empty")
-        
-        if len(user_msg) > 5000:
-            raise HTTPException(status_code=400, detail="Message too long (max 5000 characters)")
-        
+    
         intent = await agent_system.orchestrator(user_msg)
-        
-        if intent == "CHAT":
-            generator = agent_system.chat_agent_stream(user_msg)
-        elif intent == "QUIZ":
-            generator = agent_system.quiz_agent_stream(user_msg)
-        else: 
-            generator = agent_system.rag_agent_stream(user_msg)
-            
+
+        generator_map = {
+            "CHAT": agent_system.chat_agent_stream,
+            "QUIZ": agent_system.quiz_agent_stream,
+            "LEARN": agent_system.rag_agent_stream,
+        }
+
+        stream_fn = generator_map.get(intent, agent_system.rag_agent_stream)
+
+        generator = stream_fn(user_msg, session_id)
+
         return StreamingResponse(
             generator,
-            media_type="application/x-ndjson",
+            media_type="application/x-ndjson; charset=utf-8",
             headers={
                 "Cache-Control": "no-cache, no-transform",
                 "X-Content-Type-Options": "nosniff",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no", 
-                "Content-Type": "application/x-ndjson; charset=utf-8",
+                "X-Accel-Buffering": "no",
             },
         )
 
-    except HTTPException:
-        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
-        logger.error(f"Chat endpoint error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error("Chat endpoint error", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error",
+        )
