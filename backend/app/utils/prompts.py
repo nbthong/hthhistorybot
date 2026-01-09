@@ -111,14 +111,23 @@ CRITICAL REQUIREMENTS:
 # }}
 # """
 
-ORCHESTRATOR_INTENT_PROMPT: str = """
-Bạn là bộ não điều phối của hệ thống AI Gia sư Lịch sử. Bạn phải biết được nhiệm vụ của bạn là gì?
-Hãy phân loại tin nhắn của người dùng: '{user_input}' 
+# app/utils/prompts.py
 
-Chọn DUY NHẤT 1 trong 3 nhãn sau:
-1. 'LEARN': Nếu câu hỏi liên quan đến kiến thức lịch sử cụ thể, yêu cầu giải thích, tóm tắt bài học. (Cần tra cứu sách)
-2. 'QUIZ': Nếu người dùng yêu cầu làm bài tập, đố vui, kiểm tra trắc nghiệm. (Cần tra cứu sách)
-3. 'CHAT': Nếu là lời chào, hỏi thăm, tán gẫu xã giao hoặc các câu hỏi linh tinh không liên quan đến kiến thức lịch sử chuyên sâu. (Trả lời ngay không cần tra cứu)
+ORCHESTRATOR_INTENT_PROMPT: str = """
+Bạn là bộ não điều phối của hệ thống AI Gia sư Lịch sử. 
+Nhiệm vụ của bạn là phân loại ý định của người dùng dựa trên tin nhắn mới và lịch sử trò chuyện.
+
+LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY:
+{history_str}
+
+TIN NHẮN MỚI CỦA HỌC SINH: '{user_input}'
+
+QUY TẮC PHÂN LOẠI:
+1. 'LEARN': 
+   - Nếu học sinh hỏi kiến thức lịch sử.
+   - NẾU học sinh trả lời khẳng định (ví dụ: 'có', 'ok', 'đồng ý', 'vâng', 'tiếp đi') cho một câu hỏi gợi ý học tập mà giáo viên vừa đưa ra ở trên.
+2. 'QUIZ': Nếu học sinh muốn làm bài tập, trắc nghiệm.
+3. 'CHAT': Nếu là lời chào hoặc nói chuyện phiếm HOÀN TOÀN không liên quan đến bối cảnh lịch sử phía trên.
 
 Chỉ trả về 1 từ duy nhất: LEARN, QUIZ hoặc CHAT.
 """
@@ -181,6 +190,7 @@ QUY TẮC TRẢ LỜI 'SÂU':
 Ví dụ: "Trả lời: Diễn biến trận Bạch Đằng.....". Thì tiếp tục ở đây là tiếp tục và chi tiết hơn về diễn biễn trận Bạch Đằng
 11. Nếu {user_input} bảo "tóm tắt" thì hãy tóm tắc ngắn gọn vấn đề mà người dùng muốn tóm tắc.
 12. Nếu {user_input} bảo "đồng ý", "ok" thì hãy xem câu trả lời gần nhất đang có câu hỏi gì và trả lời lại câu hỏi đó.
+13. Đặc biệt lưu ý: Nếu {user_input} thuộc về việc tạo quiz thì sẽ không được gen ảnh
 Ví dụ: sau mỗi câu trả lời, nên đưa vào các câu hỏi hướng dẫn có liên quan. Ví dụ: "Bạn có muốn tìm hiểu thêm về chủ đề này không? Hãy hỏi tôi nhé!", "Bạn có muốn tìm hiểu thêm về...?" Thì bây giờ phải trả lời câu hỏi đó.
 
 VIETNAMESE OUTPUT:

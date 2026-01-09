@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 class HistoryAIAgent:
     def __init__(self) -> None:
         self.key_manager = key_manager
-        self.memory_window = deque(maxlen=6) 
         self.sessions_memory: Dict[str, deque] = {}
 
     def _get_session_memory(self, session_id: str) -> deque:
@@ -33,10 +32,14 @@ class HistoryAIAgent:
             self.sessions_memory[session_id] = deque(maxlen=6)
         return self.sessions_memory[session_id] 
 
-    async def orchestrator(self, user_input: str) -> dict:
-        prompt = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input)
+    async def orchestrator(self, user_input: str, session_id: str = "default_user") -> dict:
+        history_str = self._get_history_string(session_id)
+        prompt = ORCHESTRATOR_INTENT_PROMPT.format(user_input=user_input, history_str=history_str)
         response = self.key_manager.generate_content(prompt)
-        return json.loads(response.text)
+        intent = response.text.strip().upper()
+        if "QUIZ" in intent: return "QUIZ"
+        elif "CHAT" in intent: return "CHAT"
+        else: return "LEARN"
 
     async def _generate_image_task(self, user_input: str, context_text: str) -> tuple[str, str] | None:
         try:
@@ -136,14 +139,10 @@ class HistoryAIAgent:
         try:
             yield json.dumps({"type": "status", "message": "🔍 Thầy đang tìm tài liệu cho em..."}, ensure_ascii=False) + "\n"
             search_query = await self._condense_question(user_input, session_id)
+            knowledges = await asyncio.to_thread(search_knowledge, search_query, limit=5, use_hybrid=True)
 
-            knowledges = await asyncio.to_thread(
-                search_knowledge, search_query, limit=5, use_hybrid=True
-            )
-
-            if not knowledges:
-                yield json.dumps({"type": "error", "message": "🔍 Thầy không tìm thấy tài liệu này."}, ensure_ascii=False) + "\n"
-                return
+            context = "\n".join([k['content_text'] for k in knowledges])
+            prompt = QUIZ_GENERATION_PROMPT.format(context=context, user_input=search_query)
 
             context = "\n\n".join([f"[Trang {k.get('page_id')}]: {k['content_text']}" for k in knowledges])
 
@@ -155,13 +154,14 @@ class HistoryAIAgent:
             )
 
             full_quiz_content = ""
-            for text in self.key_manager.stream_content(prompt, use_stream_config=True):
+            for text in self.key_manager.stream_content(prompt):
                 if text:
                     full_quiz_content += text
                     yield json.dumps({"type": "text", "content": text}, ensure_ascii=False) + "\n"
-            
-            self.memory_window.append({"role": "Học sinh", "content": f"Yêu cầu làm Quiz về {search_query}"})
-            self.memory_window.append({"role": "Giáo viên", "content": "[Đã gửi bộ câu hỏi trắc nghiệm]"})
+
+            mem = self._get_session_memory(session_id)
+            mem.append({"role": "Học sinh", "content": f"Yêu cầu Quiz: {user_input}"})
+            mem.append({"role": "Giáo viên", "content": full_quiz_content})
 
         except Exception as e:
             logger.error(f"Quiz agent error: {e}", exc_info=True)
@@ -209,14 +209,18 @@ class HistoryAIAgent:
         try:
             response = await asyncio.to_thread(self.key_manager.generate_content, prompt)
             selected_data = json.loads(response.text)
-            selected_ids = selected_data.get("selected_ids", [])
+            raw_ids = selected_data.get("selected_ids", [])
+            selected_ids = []
+            for val in raw_ids:
+                try:
+                    selected_ids.append(int(val))
+                except (ValueError, TypeError):
+                    continue
             
             filtered_knowledges = [knowledges[i] for i in selected_ids if i < len(knowledges)]
-            
-            logger.info(f"Reranker: Giảm từ {len(knowledges)} đoạn xuống còn {len(filtered_knowledges)} đoạn chất lượng.")
-            return filtered_knowledges[:3] 
+            return filtered_knowledges[:7] 
         except Exception as e:
             logger.error(f"Reranking error: {e}")
-            return knowledges[:3] 
+            return knowledges[:5] 
 
 agent_system = HistoryAIAgent()

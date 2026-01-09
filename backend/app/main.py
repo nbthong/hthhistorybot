@@ -99,7 +99,7 @@ async def chat(request: ChatRequest):
     
     try:
     
-        intent = await agent_system.orchestrator(user_msg)
+        intent = await agent_system.orchestrator(user_msg, session_id)
 
         generator_map = {
             "CHAT": agent_system.chat_agent_stream,
