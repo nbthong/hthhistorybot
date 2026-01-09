@@ -86,6 +86,7 @@ MONGO_DB_NAME = "history_tutor_db"
 MONGO_COLLECTION_NAME = "knowledge_base"
 MONGO_HISTORY_COLLECTION = "chat_history"
 MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"
+MONGO_USER_COLLECTION = "users"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"
@@ -105,3 +106,7 @@ HYBRID_SEARCH_DENSE_WEIGHT = 0.7  # Weight for dense vector search (0-1)
 HYBRID_SEARCH_SPARSE_WEIGHT = 0.3  # Weight for sparse/lexical search (0-1)
 
 LIMIT_WORD_COUNT_GENERATE_IMAGE = 70
+
+JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "CHANGE_ME_PLEASE")
+JWT_ALGORITHM: str = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days 

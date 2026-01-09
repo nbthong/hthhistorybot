@@ -132,10 +132,10 @@ class HistoryAIAgent:
             logger.error(f"Error: {e}")
             yield json.dumps({"type": "error", "message": "System error."}, ensure_ascii=False) + "\n"
 
-    async def quiz_agent_stream(self, user_input: str) -> AsyncIterable[str]:
+    async def quiz_agent_stream(self, user_input: str, session_id: str = "default_user") -> AsyncIterable[str]:
         try:
             yield json.dumps({"type": "status", "message": "🔍 Thầy đang tìm tài liệu cho em..."}, ensure_ascii=False) + "\n"
-            search_query = await self._condense_question(user_input)
+            search_query = await self._condense_question(user_input, session_id)
 
             knowledges = await asyncio.to_thread(
                 search_knowledge, search_query, limit=5, use_hybrid=True

@@ -30,3 +30,5 @@ annotated-types==0.7.0
 python-multipart==0.0.21
 email-validator==2.3.0
 sentry-sdk==2.48.0
+passlib[bcrypt]==1.7.4
+PyJWT==2.9.0
