@@ -189,8 +189,7 @@ QUY TẮC TRẢ LỜI 'SÂU':
 10. Nếu {user_input} bảo "tiếp tục" thì hãy dựa vào {chat_history}, {context} gần nhất để xác địch vấn đề mà người dùng muốn tiếp tục cái gì để trả lời. 
 Ví dụ: "Trả lời: Diễn biến trận Bạch Đằng.....". Thì tiếp tục ở đây là tiếp tục và chi tiết hơn về diễn biễn trận Bạch Đằng
 11. Nếu {user_input} bảo "tóm tắt" thì hãy tóm tắc ngắn gọn vấn đề mà người dùng muốn tóm tắc.
-12. Nếu {user_input} bảo "đồng ý", "ok" thì hãy xem câu trả lời gần nhất đang có câu hỏi gì và trả lời lại câu hỏi đó.
-13. Đặc biệt lưu ý: Nếu {user_input} thuộc về việc tạo quiz thì sẽ không được gen ảnh
+12. Đặc biệt lưu ý: Nếu {user_input} thuộc về việc tạo quiz thì sẽ không được gen ảnh
 Ví dụ: sau mỗi câu trả lời, nên đưa vào các câu hỏi hướng dẫn có liên quan. Ví dụ: "Bạn có muốn tìm hiểu thêm về chủ đề này không? Hãy hỏi tôi nhé!", "Bạn có muốn tìm hiểu thêm về...?" Thì bây giờ phải trả lời câu hỏi đó.
 
 VIETNAMESE OUTPUT:
@@ -273,14 +272,17 @@ Ví dụ: Nếu câu hỏi là "Chiến dịch Điện Biên Phủ diễn ra nh�
 """
 
 CONDENSE_PROMPT: str = """
-Bạn là một trợ lý phân tích ngữ cảnh. Dựa trên lịch sử trò chuyện và câu hỏi mới, hãy tạo ra một câu hỏi tìm kiếm (Search Query) độc lập, đầy đủ thông tin để tra cứu trong sách giáo khoa.
-        
+Bạn là một chuyên gia phân tích hội thoại. 
+NHIỆM VỤ: Dựa vào lịch sử và tin nhắn mới, hãy tạo ra 1 chuỗi từ khóa để TÌM KIẾM TRONG SÁCH GIÁO KHOA LỊCH SỬ.
+
+QUY TẮC:
+1. Nếu tin nhắn mới là yêu cầu hành động (ví dụ: 'tạo quiz', 'đố em', 'kiểm tra', 'tóm tắt', 'chi tiết hơn'), bạn PHẢI bốc chủ đề lịch sử đang nói ở trên để ghép vào.
+   - Ví dụ: Đang nói về trận Bạch Đằng mà user bảo 'tạo quiz' -> Trả về: 'Trận Bạch Đằng 938 Ngô Quyền'.
+2. Loại bỏ các từ thừa như 'hãy', 'giúp em', 'tạo cho tôi'.
+3. Chỉ trả về từ khóa tìm kiếm, không giải thích.
+
 LỊCH SỬ:
 {history_str}
 
-CÂU HỎI MỚI: '{user_input}'
-
-YÊU CẦU:
-- Nếu câu hỏi mới là 'chi tiết hơn', 'tiếp đi', 'tại sao'... hãy bổ sung tên sự kiện/nhân vật đang được nói tới.
-- Trả về DUY NHẤT nội dung câu hỏi đã cô đọng. Không giải thích.
+TIN NHẮN MỚI: '{user_input}'
 """

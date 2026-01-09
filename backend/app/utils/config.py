@@ -87,6 +87,7 @@ MONGO_COLLECTION_NAME = "knowledge_base"
 MONGO_HISTORY_COLLECTION = "chat_history"
 MONGO_VECTOR_COLLECTION_GEMINI = "knowledge_vectors_gemini"
 MONGO_USER_COLLECTION = "users"
+MONGO_CHAT_HISTORY_COLLECTION = "chat_history"
 
 MONGO_ATLAS_VECTOR_INDEX_NAME = "vector_index"
 MONGO_ATLAS_VECTOR_PATH = "embedding_vector"

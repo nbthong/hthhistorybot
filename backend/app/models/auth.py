@@ -7,6 +7,7 @@ import hashlib
 import jwt
 from typing import Any, Dict
 from app.databases.database import get_collection
+from fastapi import Depends
 from app.utils.config import JWT_SECRET_KEY, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 class UserBase(BaseModel):
@@ -29,7 +30,7 @@ class Token(BaseModel):
 
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login", auto_error=False)
 
 
 def _get_users_collection():
@@ -58,3 +59,13 @@ def _create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload.get("sub") 
+    except jwt.PyJWTError:
+        return None

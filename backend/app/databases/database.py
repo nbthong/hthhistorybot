@@ -9,7 +9,9 @@ from app.utils.config import (
     ENV_FILE,
     MONGO_COLLECTION_NAME,
     MONGO_DB_NAME,
+    MONGO_CHAT_HISTORY_COLLECTION,
 )
+from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -114,3 +116,22 @@ try:
 except Exception as e:
     logger.warning(f"Failed to initialize MongoDB connection: {e}")
     logger.warning("MongoDB operations will fail until connection is established.")
+
+def get_history_from_mongo(user_id: str, session_id: Optional[str] = None, limit: int = 50):
+    col = get_collection(MONGO_CHAT_HISTORY_COLLECTION)
+    query = {"user_id": user_id}
+    if session_id:
+        query["session_id"] = session_id
+    
+    cursor = col.find(query).sort("timestamp", 1).limit(limit) 
+    return list(cursor)
+
+def save_message_to_mongo(user_id: str, session_id: str, role: str, content: str):
+    col = get_collection(MONGO_CHAT_HISTORY_COLLECTION)
+    col.insert_one({
+        "user_id": user_id,
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "timestamp": datetime.utcnow()
+    })
