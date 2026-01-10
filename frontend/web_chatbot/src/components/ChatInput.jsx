@@ -23,7 +23,7 @@ function ChatInput({ onSend, disabled = false }) {
   };
 
   return (
-    <div className="mt-6 px-10">
+    <div className="mt-6 px-10 mb-3">
       <form onSubmit={handleSubmit} className="bg-white rounded-full shadow-md flex items-center px-5 py-3 gap-3">
         <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
           <span className="text-pink-500 text-sm">🧠</span>

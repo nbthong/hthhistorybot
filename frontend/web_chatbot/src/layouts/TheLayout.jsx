@@ -11,10 +11,7 @@ import {
   getUserEmail,
   logoutWithAPI,
 } from "../utils/auth";
-import {
-  getConversationHistory,
-  getConversationDetail,
-} from "../api/chatApi";
+import { getConversationHistory, getConversationDetail } from "../api/chatApi";
 
 function generateSessionId() {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -28,8 +25,11 @@ export default function TheLayout() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  const [currentSessionId, setCurrentSessionId] = useState(() => generateSessionId());
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+
+  const [currentSessionId, setCurrentSessionId] = useState(() =>
+    generateSessionId()
+  );
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -43,7 +43,7 @@ export default function TheLayout() {
 
   const loadConversationHistory = async () => {
     if (!isUser) return;
-    
+
     setLoadingHistory(true);
     try {
       const history = await getConversationHistory();
@@ -90,14 +90,14 @@ export default function TheLayout() {
   const handleLogout = async () => {
     try {
       await logoutWithAPI();
-      
+
       setMessages([]);
       setConversations([]);
       setActiveConversationId(null);
       setCurrentSessionId(generateSessionId());
       setShowQuiz(false);
       setQuiz([]);
-      
+
       navigate("/login");
     } catch (error) {
       console.error("Error during logout:", error);
@@ -129,7 +129,7 @@ export default function TheLayout() {
 
     const isFirstMessage = messages.length === 0;
     const isNewConversation = activeConversationId === null;
-    
+
     // Thêm user + 1 bot placeholder
     setMessages((prev) => [
       ...prev,
@@ -151,7 +151,7 @@ export default function TheLayout() {
       const body = {
         message: text,
       };
-      
+
       if (isUser && currentSessionId) {
         body.session_id = currentSessionId;
       }
@@ -177,6 +177,7 @@ export default function TheLayout() {
             const questions = parseQuestions(buffer);
             setQuiz(questions);
             setShowQuiz(true);
+            setLoadingQuiz(false);
           }
           break;
         }
@@ -214,6 +215,7 @@ export default function TheLayout() {
             data.message.indexOf("tạo câu hỏi trắc nghiệm") > 0
           ) {
             isShowQuiz = true;
+            setLoadingQuiz(true);
           }
           setMessages((prev) => {
             const clone = [...prev];
@@ -272,7 +274,7 @@ export default function TheLayout() {
 
   const status_display = isMobile ? !collapsed : collapsed;
   const userEmail = getUserEmail();
-  
+
   return (
     <div className="bg-[#FDEDEA] h-screen overflow-hidden">
       <div className="flex h-full">
@@ -288,9 +290,9 @@ export default function TheLayout() {
           userEmail={userEmail}
           onLogout={handleLogout}
         />
-        
+
         {isMobile && !status_display && (
-          <div 
+          <div
             className="fixed inset-0 bg-black bg-opacity-40 z-40"
             onClick={() => setCollapsed(true)}
           />
@@ -301,18 +303,15 @@ export default function TheLayout() {
           {showQuiz && (
             <QuizModal onClose={() => setShowQuiz(false)} questions={quiz} />
           )}
-          <ChatMessages 
-            messages={messages} 
+          <ChatMessages
+            messages={messages}
             onSuggestionSelect={(question) => {
               handleSend(question);
             }}
+            statusLoading={loading}
+            statusLoadingQuiz={loadingQuiz}
           />
           <ChatInput onSend={handleSend} disabled={loading} />
-          {loading && (
-            <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-lg shadow-md text-sm text-gray-600">
-              Đang trả lời...
-            </div>
-          )}
         </main>
       </div>
     </div>

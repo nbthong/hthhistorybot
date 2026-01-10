@@ -21,7 +21,12 @@ const parseQuestions = (contentQuestions) => {
   return questions;
 };
 
-function ChatMessages({ messages, onSuggestionSelect }) {
+function ChatMessages({
+  messages,
+  onSuggestionSelect,
+  statusLoading,
+  statusLoadingQuiz,
+}) {
   const bottomRef = useRef(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
@@ -80,13 +85,17 @@ function ChatMessages({ messages, onSuggestionSelect }) {
           if (isBot) {
             return (
               <div key={i} className="flex gap-4">
-                <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                  AI
+                <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center flex justify-center text-white font-bold flex-shrink-0">
+                  {statusLoading && i == messages.length - 1 ? (
+                    <span className="loading-spinner">⏳️</span>
+                  ) : (
+                    "AI"
+                  )}
                 </div>
                 <div className="bg-white rounded-2xl p-6 max-w-3xl shadow-sm flex-1">
                   {isValidQuizFormat(m.text) ? (
                     <>
-                      <p className="font-semibold mb-2">Làm bài test</p>
+                      <p className="font-semibold mb-2">Làm bài test với nội dung: [{messages[i-1].text}]</p>
                       <button
                         onClick={() => {
                           setQuiz(parseQuestions(m.text));
@@ -94,7 +103,7 @@ function ChatMessages({ messages, onSuggestionSelect }) {
                         }}
                         className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
                       >
-                        Start Quiz
+                        Bắt Đầu Làm Bài
                       </button>
                     </>
                   ) : (
@@ -102,25 +111,29 @@ function ChatMessages({ messages, onSuggestionSelect }) {
                       <div
                         className="text-sm text-gray-700 prose prose-sm max-w-none"
                         dangerouslySetInnerHTML={{
-                          __html: m.text
+                          __html: (statusLoading && statusLoadingQuiz
+                            ? "Đang tạo bài thi trắc nghiệm"
+                            : m.text
+                          )
                             .replace(/\n/g, "<br/>")
                             .replace(/\*\*(.+?):\*\*/g, "<strong>$1:</strong>")
                             .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"),
                         }}
                       />
                       <div className="mt-4 flex items-center gap-4 text-xs text-gray-400">
-                        <button className="hover:text-gray-600 transition">👍</button>
-                        <button className="hover:text-gray-600 transition">👎</button>
-                        <button className="hover:text-gray-600 transition">📋</button>
-                        <button className="hover:text-gray-600 transition">🔗</button>
+                        <button className="hover:text-gray-600 transition">
+                          👍
+                        </button>
+                        <button className="hover:text-gray-600 transition">
+                          👎
+                        </button>
+                        <button className="hover:text-gray-600 transition">
+                          📋
+                        </button>
+                        <button className="hover:text-gray-600 transition">
+                          🔗
+                        </button>
                       </div>
-                      {/* {i === messages.length - 1 && (
-                        <div className="mt-4 text-right">
-                          <button className="text-xs text-indigo-500 hover:underline">
-                            Regenerate
-                          </button>
-                        </div>
-                      )} */}
                     </>
                   )}
                 </div>
