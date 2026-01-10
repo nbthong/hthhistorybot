@@ -226,14 +226,11 @@ export default function TheLayout() {
             const item_json = JSON.parse(item_buffer);
             buffer_err = "";
             data = item_json;
-            console.log(item_json);
           } catch {
             buffer_err += item_buffer;
             try {
-              console.log(buffer_err);
               const item_json = JSON.parse(buffer_err);
               data = item_json;
-              console.log(item_json);
             } catch (finalError) {
               console.log(finalError);
             }

@@ -102,7 +102,7 @@ function ChatMessages({
                     </button>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {m.text}
+                    {m.text.replace("Yêu cầu Quiz:", "")}
                   </p>
                 </div>
               </div>
@@ -123,7 +123,8 @@ function ChatMessages({
                   {isValidQuizFormat(m.text) ? (
                     <>
                       <p className="font-semibold mb-2">
-                        Làm bài test với nội dung: [{messages[i - 1].text}]
+                        Làm bài test với nội dung: [
+                        {messages[i - 1].text.replace("Yêu cầu Quiz:", "")}]
                       </p>
                       <button
                         onClick={() => {

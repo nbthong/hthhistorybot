@@ -115,7 +115,7 @@ function Sidebar({
                     onSelectConversation(conv.id || conv.session_id)
                   }
                 >
-                  <span className="flex-1 truncate">{conv.title}</span>
+                  <span className="flex-1 truncate">{conv.title.replace("Yêu cầu Quiz:", "")}</span>
                   {activeConversationId === (conv.id || conv.session_id) && (
                     <span className="text-xs ml-2">●</span>
                   )}
