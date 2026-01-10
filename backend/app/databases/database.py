@@ -126,12 +126,24 @@ def get_history_from_mongo(user_id: str, session_id: Optional[str] = None, limit
     cursor = col.find(query).sort("timestamp", 1).limit(limit) 
     return list(cursor)
 
-def save_message_to_mongo(user_id: str, session_id: str, role: str, content: str):
+def save_message_to_mongo(
+    user_id: str,
+    session_id: str,
+    role: str,
+    content: str,
+    image: Optional[dict] = None,
+    message_type: str = "text",
+):
     col = get_collection(MONGO_CHAT_HISTORY_COLLECTION)
-    col.insert_one({
+    record = {
         "user_id": user_id,
         "session_id": session_id,
         "role": role,
         "content": content,
+        "message_type": message_type,
         "timestamp": datetime.utcnow()
-    })
+    }
+    if image:
+        record["image"] = image 
+        
+    col.insert_one(record)

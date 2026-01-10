@@ -33,15 +33,28 @@ class HistoryAIAgent:
             self.sessions_memory[session_id] = deque(maxlen=6)
         return self.sessions_memory[session_id] 
     
+    @staticmethod
+    def _is_image_history_item(item: Dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        if item.get("message_type") == "image":
+            return True
+        if item.get("image") is not None:
+            return True
+        content = str(item.get("content") or "")
+        return "<img" in content.lower()
+
     async def _get_unified_history(self, session_id: str, user_id: Optional[str] = None) -> str:
         if user_id:
             hist = await asyncio.to_thread(get_history_from_mongo, user_id, session_id, 6)
             if not hist: return ""
-            return "\n".join([f"{'Học sinh' if h['role']=='user' else 'Giáo viên'}: {h['content']}" for h in hist])
+            text_hist = [h for h in hist if not self._is_image_history_item(h)]
+            return "\n".join([f"{'Học sinh' if h.get('role')=='user' else 'Giáo viên'}: {h.get('content','')}" for h in text_hist])
         
         mem = self._get_session_memory(session_id)
         if not mem: return ""
-        return "\n".join([f"{m['role']}: {m['content']}" for m in mem])
+        text_mem = [m for m in mem if not self._is_image_history_item(m)]
+        return "\n".join([f"{m.get('role')}: {m.get('content')}" for m in text_mem])
 
     async def orchestrator(self, user_input: str, session_id: str, user_id: Optional[str] = None) -> str:
         history_str = await self._get_unified_history(session_id, user_id)
@@ -111,6 +124,8 @@ class HistoryAIAgent:
             
             should_gen_image = force_gen_image or (word_count > LIMIT_WORD_COUNT_GENERATE_IMAGE)
 
+            final_image_data = None 
+            image_html: str | None = None
             if should_gen_image and os.getenv("ENABLE_IMAGE_GENERATION") == "1":
                 yield json.dumps({
                     "type": "status", 
@@ -121,20 +136,35 @@ class HistoryAIAgent:
                 
                 if image_result:
                     mime_type, image_base64 = image_result
+                    final_image_data = {"mime_type": mime_type, "data": image_base64}
+                    # FE-friendly: chỉ cần render `content` là ra ảnh ngay
+                    image_html = f'<img src="data:{mime_type};base64,{image_base64}" class="chat-image"/>'
                     yield json.dumps({
                         "type": "image", 
                         "mime_type": mime_type, 
                         "data": image_base64
                     }, ensure_ascii=False) + "\n"
 
-
             if user_id:
-                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "user", user_input)
-                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "assistant", full_response)
+                await asyncio.to_thread(
+                    save_message_to_mongo,
+                    user_id, session_id, "user", user_input, None, "text"
+                )
+                await asyncio.to_thread(
+                    save_message_to_mongo,
+                    user_id, session_id, "assistant", full_response, None, "text"
+                )
+                # Lưu riêng 1 record cho ảnh (nếu có)
+                if image_html and final_image_data:
+                    await asyncio.to_thread(
+                        save_message_to_mongo,
+                        user_id, session_id, "assistant", image_html, final_image_data, "image"
+                    )
             mem = self._get_session_memory(session_id)
-            mem.append({"role": "Học sinh", "content": user_input})
-            mem.append({"role": "Giáo viên", "content": full_response})
-
+            mem.append({"role": "Học sinh", "content": user_input, "message_type": "text"})
+            mem.append({"role": "Giáo viên", "content": full_response, "message_type": "text"})
+            if image_html:
+                mem.append({"role": "Giáo viên", "content": image_html, "message_type": "image"})
         except Exception as e:
             logger.error(f"Error: {e}")
             yield json.dumps({"type": "error", "message": "System error."}, ensure_ascii=False) + "\n"
@@ -164,12 +194,12 @@ class HistoryAIAgent:
                     yield json.dumps({"type": "text", "content": text}, ensure_ascii=False) + "\n"
 
             if user_id:
-                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "user", f"Yêu cầu Quiz: {user_input}")
-                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "assistant", "[Bộ câu hỏi trắc nghiệm]")
+                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "user", f"Yêu cầu Quiz: {user_input}", None, "text")
+                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "assistant", "[Bộ câu hỏi trắc nghiệm]", None, "text")
             
             mem = self._get_session_memory(session_id)
-            mem.append({"role": "Học sinh", "content": user_input})
-            mem.append({"role": "Giáo viên", "content": "[Đã gửi bộ câu hỏi trắc nghiệm]"})
+            mem.append({"role": "Học sinh", "content": user_input, "message_type": "text"})
+            mem.append({"role": "Giáo viên", "content": "[Đã gửi bộ câu hỏi trắc nghiệm]", "message_type": "text"})
 
         except Exception as e:
             logger.error(f"Quiz agent error: {e}", exc_info=True)
@@ -192,12 +222,12 @@ class HistoryAIAgent:
                     yield f"{data}\n"
 
             if user_id:
-                save_message_to_mongo(user_id, session_id, "user", user_input)
-                save_message_to_mongo(user_id, session_id, "assistant", full_response)
+                save_message_to_mongo(user_id, session_id, "user", user_input, None, "text")
+                save_message_to_mongo(user_id, session_id, "assistant", full_response, None, "text")
             else:
                 mem = self._get_session_memory(session_id)
-                mem.append({"role": "Học sinh", "content": user_input})
-                mem.append({"role": "Giáo viên", "content": full_response})
+                mem.append({"role": "Học sinh", "content": user_input, "message_type": "text"})
+                mem.append({"role": "Giáo viên", "content": full_response, "message_type": "text"})
                     
         except Exception as e:
             logger.error(f"Chat agent error: {e}")
@@ -246,7 +276,8 @@ class HistoryAIAgent:
             hist = get_history_from_mongo(user_id, session_id, limit=6)
             if not hist:
                 return "Chưa có lịch sử trò chuyện."
-            return "\n".join([f"{'Học sinh' if h['role']=='user' else 'Giáo viên'}: {h['content']}" for h in hist])
+            text_hist = [h for h in hist if not self._is_image_history_item(h)]
+            return "\n".join([f"{'Học sinh' if h.get('role')=='user' else 'Giáo viên'}: {h.get('content','')}" for h in text_hist])
         else:
             return self._get_history_string(session_id)
 
