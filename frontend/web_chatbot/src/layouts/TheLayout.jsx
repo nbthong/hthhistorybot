@@ -4,6 +4,7 @@ import ChatMessages from "../components/ChatMessages";
 import ChatInput from "../components/ChatInput";
 import QuizModal from "../components/QuizModal";
 import useIsMobile from "../common/useIsMobile";
+import { useParams } from "react-router-dom";
 
 export default function TheLayout() {
   const isMobile = useIsMobile();
@@ -12,6 +13,12 @@ export default function TheLayout() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { session_id } = useParams();
+
+  let value_session_id = session_id;
+  if (!value_session_id) {
+    value_session_id = new Date().toISOString().replace(/[:.-]/g, "");
+  }
 
   const parseQuestions = (contentQuestions) => {
     let questions = [];
@@ -44,10 +51,14 @@ export default function TheLayout() {
 
     try {
       const apiURL = import.meta.env.VITE_API_URL;
+      const access_token = localStorage.getItem("access_token");
       const res = await fetch(`${apiURL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${access_token}`,
+        },
+        body: JSON.stringify({ message: text, session_id: value_session_id }),
       });
 
       if (!res.ok || !res.body) throw new Error("Server error");
@@ -164,7 +175,7 @@ export default function TheLayout() {
       )}
 
       <div className={`main ${status_display ? "collapsed" : ""}`}>
-        <div className="main-header p-2 border-bottom">
+        <div className="main-header p-2">
           <button
             className="btn-menu-mobile btn btn-light me-2"
             onClick={() => setCollapsed(!collapsed)}

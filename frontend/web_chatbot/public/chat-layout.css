@@ -46,3 +46,8 @@
   border: none;
   box-shadow: none;
 }
+history-item {
+  padding-left: 20px !important;
+  margin-bottom: 10px !important;
+  border-bottom: 1px solid !important;
+}
