@@ -31,7 +31,7 @@ export default function QuizModal({ questions, onClose }) {
 
   return (
     <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-dialog modal-dialog-centered modal-quiz">
         <div className="modal-content rounded-4 shadow-lg p-2">
           <div className="modal-header border-0">
             <h5 className="modal-title fw-bold fs-4">Quiz Lịch sử</h5>
