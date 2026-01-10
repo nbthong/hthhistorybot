@@ -26,7 +26,7 @@ export async function getConversationHistory() {
     const history = data.history || [];
 
     const sessionMap = new Map();
-    
+
     history.forEach((msg) => {
       const sessionId = msg.session_id;
       if (!sessionId) return;
@@ -35,11 +35,11 @@ export async function getConversationHistory() {
         const title = msg.content
           ? msg.content.substring(0, 50).trim()
           : "New Conversation";
-        
+
         sessionMap.set(sessionId, {
           session_id: sessionId,
           title: title,
-          id: sessionId, 
+          id: sessionId,
         });
       }
     });
@@ -50,7 +50,6 @@ export async function getConversationHistory() {
     return [];
   }
 }
-
 
 export async function getConversationDetail(sessionId, limit = 100) {
   try {
@@ -77,8 +76,19 @@ export async function getConversationDetail(sessionId, limit = 100) {
 
     const data = await res.json();
     const history = data.history || [];
+    const result = [];
 
-    return history.map((msg) => ({
+    for (const item of history) {
+      const last = result[result.length - 1];
+
+      if (last && last.role === item.role) {
+        last.content += item.content;
+      } else {
+        result.push({ ...item });
+      }
+    }
+
+    return result.map((msg) => ({
       role: msg.role === "user" ? "user" : "bot",
       text: msg.content || "",
     }));
