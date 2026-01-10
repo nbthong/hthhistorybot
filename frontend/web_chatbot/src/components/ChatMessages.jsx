@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useState } from "react";
 import QuizModal from "./QuizModal";
+import SuggestionsSection from "./SuggestionsSection";
 
 const parseQuestions = (contentQuestions) => {
   let questions = [];
@@ -19,102 +20,119 @@ const parseQuestions = (contentQuestions) => {
 
   return questions;
 };
-function ChatMessages({ messages }) {
+
+function ChatMessages({ messages, onSuggestionSelect }) {
   const bottomRef = useRef(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
 
   const isValidQuizFormat = (input) => {
-    console.log(input);
+    if (!input || !input.includes("||")) return false;
     const blocks = input.split("||");
-    if (!input.includes("||")) return false;
-
     return blocks.every((block) => {
       const parts = block.split(">>").map((p) => p.trim());
-      if (parts.length !== 6) return false;
-
+      if (parts.length < 6) return false;
       const options = parts.slice(1, 5);
       const correct = parts[5];
-      const note = parts[6] || "";
-
-      // Kiểm tra correct có nằm trong options không
-      if (!options.includes(correct)) return false;
-
-      return true;
+      return options.includes(correct);
     });
   };
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  if (!messages || messages.length == 0)
-    return (
-      <div className="messages">
-        <div className="container container-messages">
-          <div className="text-start">
-            <h1 className="fw-bold">
-              <span className="fs-4">📚</span>Lịch Sử 10, 11, 12 AI Tutor –
-              Chatbot
-            </h1>
-          </div>
-
-          <div className="mt-4">
-            <div className="d-flex text-start gap-2">
-              <h4 className="mb-0">
-                Xin chào, mình là Lịch Sử 10, 11, 12 AI Tutor.
-              </h4>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <p className="fs-5 text-start">Bạn có thể:</p>
-            <ul className="mx-auto">
-              <li className="">
-                Hỏi giải thích các sự kiện, nhân vật lịch sử lớp 10, 11, 12.
-              </li>
-              <li className="">
-                Yêu cầu tạo quiz / câu hỏi trắc nghiệm về một chủ đề lịch sử.
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    );
+  if (!messages || messages.length === 0) {
+    return <SuggestionsSection onSelectSuggestion={onSuggestionSelect} />;
+  }
 
   return (
-    <div className="messages">
+    <>
       {showQuiz && (
         <QuizModal onClose={() => setShowQuiz(false)} questions={quiz} />
       )}
-      {messages.map((m, i) => (
-        <div key={i} className={`message ${m.role}`}>
-          <div className="bubble">
-            {isValidQuizFormat(m.text) ? (
-              <>
-                <div>Làm bài test</div>
-                <button
-                  onClick={() => {
-                    setQuiz(parseQuestions(m.text));
-                    setShowQuiz(true);
-                  }}
-                >
-                  Start
-                </button>
-              </>
-            ) : (
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: m.text
-                    .replace(/\n/g, "<br/>")
-                    .replace(/\*\*(.+?):\*\*/g, "<strong>$1:</strong>"),
-                }}
-              />
-            )}
-          </div>
-        </div>
-      ))}
-      <div ref={bottomRef} />
-    </div>
+      <div className="flex-1 overflow-y-auto space-y-8 px-10 py-8 pr-4">
+        {messages.map((m, i) => {
+          const isUser = m.role === "user";
+          const isBot = m.role === "bot" || m.role === "assistant";
+
+          if (isUser) {
+            return (
+              <div key={i} className="flex gap-4 justify-end">
+                <div className="bg-white rounded-2xl p-6 max-w-3xl shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs text-gray-600">
+                      U
+                    </div>
+                    <span className="text-sm text-gray-500">You</span>
+                    <button className="ml-auto text-gray-400 hover:text-gray-600 text-xs">
+                      ✎
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {m.text}
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
+          if (isBot) {
+            return (
+              <div key={i} className="flex gap-4">
+                <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                  AI
+                </div>
+                <div className="bg-white rounded-2xl p-6 max-w-3xl shadow-sm flex-1">
+                  {isValidQuizFormat(m.text) ? (
+                    <>
+                      <p className="font-semibold mb-2">Làm bài test</p>
+                      <button
+                        onClick={() => {
+                          setQuiz(parseQuestions(m.text));
+                          setShowQuiz(true);
+                        }}
+                        className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
+                      >
+                        Start Quiz
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="text-sm text-gray-700 prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{
+                          __html: m.text
+                            .replace(/\n/g, "<br/>")
+                            .replace(/\*\*(.+?):\*\*/g, "<strong>$1:</strong>")
+                            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"),
+                        }}
+                      />
+                      <div className="mt-4 flex items-center gap-4 text-xs text-gray-400">
+                        <button className="hover:text-gray-600 transition">👍</button>
+                        <button className="hover:text-gray-600 transition">👎</button>
+                        <button className="hover:text-gray-600 transition">📋</button>
+                        <button className="hover:text-gray-600 transition">🔗</button>
+                      </div>
+                      {/* {i === messages.length - 1 && (
+                        <div className="mt-4 text-right">
+                          <button className="text-xs text-indigo-500 hover:underline">
+                            Regenerate
+                          </button>
+                        </div>
+                      )} */}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          return null;
+        })}
+        <div ref={bottomRef} />
+      </div>
+    </>
   );
 }
 

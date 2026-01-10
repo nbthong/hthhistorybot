@@ -1,78 +1,187 @@
 import useIsMobile from "../common/useIsMobile";
 import { useState } from "react";
 
-function Sidebar({ collapsed, onToggle }) {
+function Sidebar({
+  collapsed,
+  onToggle,
+  conversations = [],
+  activeConversationId,
+  onNewChat,
+  onSelectConversation,
+  isUser = false,
+  loadingHistory = false,
+  userEmail = null,
+  onLogout,
+}) {
   const isMobile = useIsMobile();
-  const [history, setHistory] = useState([]);
+  const [editingId, setEditingId] = useState(null);
 
-  const history_chats = async () => {
-    const apiURL = import.meta.env.VITE_API_URL;
-    const access_token = localStorage.getItem("access_token");
-    const res = await fetch(`${apiURL}/chat/history`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-    if (!res.ok || !res.body) throw new Error("Server error");
-    const data = await res.json();
-    console.log(data);
-    const result = Object.values(
-      data.history
-        .filter((item) => item.role === "user")
-        .reduce((acc, item) => {
-          const key = item.session_id;
+  const displayConversations = isUser ? conversations : [];
 
-          if (
-            !acc[key] ||
-            new Date(item.timestamp) < new Date(acc[key].timestamp)
-          ) {
-            acc[key] = item;
-          }
-
-          return acc;
-        }, {})
-    );
-    setHistory(result);
-  };
-  history_chats();
-  return (
-    <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      {/* Row 1 */}
-      <div className="sidebar-header">
-        <strong>
-          <img src="./logo.jpg" />
-        </strong>
+  if (collapsed && !isMobile) {
+    return (
+      <aside className="w-20 bg-white rounded-r-3xl shadow-md flex flex-col items-center py-4">
         <button
-          className="btn btn-sm btn-outline-secondary btn-menu"
           onClick={onToggle}
+          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
         >
-          {isMobile ? "✕" : "☰"}
+          ☰
+        </button>
+        <button
+          onClick={onNewChat}
+          className="mt-4 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition text-xl"
+        >
+          +
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="w-72 bg-white rounded-r-3xl shadow-md flex flex-col h-screen">
+      {/* Header */}
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold tracking-tight">
+            CHAT A<span className="text-indigo-500">I+</span>
+          </h1>
+          {isMobile && (
+            <button
+              onClick={onToggle}
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <button
+          onClick={onNewChat}
+          className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white py-2 rounded-xl hover:bg-indigo-600 transition"
+        >
+          <span className="text-lg">+</span>
+          New chat
         </button>
       </div>
 
-      {/* Row 2 */}
-      <div className="p-2">
-        <a className="btn btn-primary w-100" href="/">
-          <i className="bi bi-chat-left-dots me-2"></i>
-          {!collapsed && "Chat mới"}
-        </a>
+      {isUser && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-gray-400 text-xs">Your conversations</p>
+            {displayConversations.length > 0 && (
+              <button className="text-xs text-gray-400 hover:text-gray-600">
+                Clear All
+              </button>
+            )}
+          </div>
+
+          {loadingHistory ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-xs text-gray-400">Loading...</p>
+            </div>
+          ) : displayConversations.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-xs text-gray-400 text-center">
+                No conversations yet.<br />
+                Start a new chat to begin!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {displayConversations.map((conv) => (
+                <div
+                  key={conv.id || conv.session_id}
+                  className={`px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center group ${
+                    activeConversationId === (conv.id || conv.session_id)
+                      ? "bg-indigo-50 text-indigo-600 font-medium"
+                      : "hover:bg-gray-100"
+                  }`}
+                  onClick={() =>
+                    onSelectConversation &&
+                    onSelectConversation(conv.id || conv.session_id)
+                  }
+                >
+                  <span className="flex-1 truncate">{conv.title}</span>
+                  {activeConversationId === (conv.id || conv.session_id) && (
+                    <span className="text-xs ml-2">●</span>
+                  )}
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 ml-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(conv.id || conv.session_id);
+                      }}
+                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded text-gray-500"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className="w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded text-gray-500"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isUser && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
+          <div className="flex items-center justify-center py-8">
+            <p className="text-xs text-gray-400 text-center">
+              <a
+                href="/login"
+                className="text-indigo-500 hover:underline"
+              >
+                Login
+              </a>{" "}
+              to save and view your conversation history
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile */}
+      <div className="p-4 border-t">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs">
+            {isUser && userEmail
+              ? userEmail.substring(0, 2).toUpperCase()
+              : "GU"}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {isUser && userEmail ? userEmail : "Guest"}
+            </p>
+            <p className="text-xs text-gray-400">
+              {isUser ? (
+                <span className="text-gray-400">Settings</span>
+              ) : (
+                <a href="/login" className="text-indigo-500 hover:underline">
+                  Login
+                </a>
+              )}
+            </p>
+          </div>
+        </div>
+        
+        {/* Logout Button - Chỉ hiển thị nếu user đã login */}
+        {isUser && onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition flex items-center justify-center gap-2"
+          >
+            <span>🚪</span>
+            Logout
+          </button>
+        )}
       </div>
-      {/* Row 3 */}
-      <div className="sidebar-body">
-        <span>Lịch sử</span>
-        {!collapsed &&
-          history.map((item) => (
-            <a
-              className="list-group-item list-group-item-action history-item"
-              href={`/chat/${item.session_id}`}
-            >
-              {item.content}
-            </a>
-          ))}
-      </div>
-    </div>
+    </aside>
   );
 }
 
