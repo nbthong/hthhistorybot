@@ -14,6 +14,7 @@ function App() {
         <Route element={<TheLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/chatbot" element={<Chatbot />} />
+          <Route path="/chat/:session_id" element={<Chatbot />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
