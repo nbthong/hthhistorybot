@@ -89,6 +89,28 @@ def ensure_kb_indexes() -> None:
         logger.warning("KB index 'page_id' may already exist: %s", e)
 
 
+def ensure_chat_history_indexes() -> None:
+    col = get_collection(MONGO_CHAT_HISTORY_COLLECTION)
+    try:
+        col.create_index([("user_id", 1), ("timestamp", -1)])
+        logger.info("Created index on (user_id, timestamp DESC) for chat_history")
+    except Exception as e:
+        logger.warning("Index on (user_id, timestamp DESC) may already exist: %s", e)
+    
+    try:
+        col.create_index([("session_id", 1), ("timestamp", -1)])
+        logger.info("Created index on (session_id, timestamp DESC) for chat_history")
+    except Exception as e:
+        logger.warning("Index on (session_id, timestamp DESC) may already exist: %s", e)
+    
+    # Index cũ (ascending) để backward compatibility
+    try:
+        col.create_index([("user_id", 1), ("timestamp", 1)])
+        logger.info("Created index on (user_id, timestamp ASC) for chat_history")
+    except Exception as e:
+        logger.warning("Index on (user_id, timestamp ASC) may already exist: %s", e)
+
+
 def close_connection() -> None:
     global _client, _db, _collection
 
@@ -123,8 +145,34 @@ def get_history_from_mongo(user_id: str, session_id: Optional[str] = None, limit
     if session_id:
         query["session_id"] = session_id
     
-    cursor = col.find(query).sort("timestamp", 1).limit(limit) 
-    return list(cursor)
+    projection = {
+        "_id": 1,
+        "session_id": 1,
+        "role": 1,
+        "content": 1,
+        "timestamp": 1,
+        "message_type": 1,
+        "image": 1
+    }
+    
+    cursor = (
+        col.find(query, projection)
+        .sort("timestamp", -1)  
+        .limit(limit)
+        .allow_disk_use(True)
+    )
+    
+    try:
+        if session_id:
+            cursor = cursor.hint([("session_id", 1), ("timestamp", -1)])
+        else:
+            cursor = cursor.hint([("user_id", 1), ("timestamp", -1)])
+    except Exception:
+        pass
+    
+    results = list(cursor)
+    results.reverse()
+    return results
 
 def save_message_to_mongo(
     user_id: str,

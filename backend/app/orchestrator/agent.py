@@ -137,7 +137,6 @@ class HistoryAIAgent:
                 if image_result:
                     mime_type, image_base64 = image_result
                     final_image_data = {"mime_type": mime_type, "data": image_base64}
-                    # FE-friendly: chỉ cần render `content` là ra ảnh ngay
                     image_html = f'<img src="data:{mime_type};base64,{image_base64}" class="chat-image"/>'
                     yield json.dumps({
                         "type": "image", 
@@ -154,7 +153,6 @@ class HistoryAIAgent:
                     save_message_to_mongo,
                     user_id, session_id, "assistant", full_response, None, "text"
                 )
-                # Lưu riêng 1 record cho ảnh (nếu có)
                 if image_html and final_image_data:
                     await asyncio.to_thread(
                         save_message_to_mongo,

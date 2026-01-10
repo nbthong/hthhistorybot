@@ -1,18 +1,25 @@
 # Build stage
-FROM node:20-alpine AS build
+FROM node:18-alpine as build-stage
 
-WORKDIR .
+WORKDIR /app
 
-COPY package.json package-lock.json ./
+# Build argument for API URL
+ARG VITE_API_URL=http://54.179.11.118
+ENV VITE_API_URL=$VITE_API_URL
+
+COPY package*.json ./
 RUN npm install
 
 COPY . .
 RUN npm run build
 
 # Serve stage
-FROM nginx:alpine
+FROM nginx:alpine as production-stage
 
-COPY --from=build /dist /usr/share/nginx/html
+# Copy built files from build stage
+COPY --from=build-stage /app/dist /usr/share/nginx/html
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

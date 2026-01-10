@@ -1,5 +1,5 @@
 import logging
-from app.databases.database import ensure_kb_indexes, get_database
+from app.databases.database import ensure_kb_indexes, get_database, ensure_chat_history_indexes
 from app.databases.vector_store import ensure_vector_indexes
 from app.utils.config import MONGO_COLLECTION_NAME, MONGO_VECTOR_COLLECTION_GEMINI
 
@@ -19,6 +19,11 @@ def create_indexes():
     logger.info(f"\nSetting up indexes for '{MONGO_VECTOR_COLLECTION_GEMINI}'...")
     ensure_vector_indexes(MONGO_VECTOR_COLLECTION_GEMINI)
     logger.info("✅ Vector indexes ensured")
+    
+    # Collection chat_history
+    logger.info("\nSetting up indexes for 'chat_history'...")
+    ensure_chat_history_indexes()
+    logger.info("✅ Chat history indexes ensured")
     
     # Vector Search Index (only MongoDB Atlas supported)
     logger.info("\n" + "="*60)
