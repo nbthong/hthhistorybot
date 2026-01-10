@@ -20,16 +20,18 @@ function Sidebar({
 
   if (collapsed && !isMobile) {
     return (
-      <aside className="w-20 bg-white rounded-r-3xl shadow-md flex flex-col items-center py-4">
+      <aside className="w-20 bg-white rounded-r-3xl shadow-md flex flex-col items-center py-4 transition-all duration-300">
         <button
           onClick={onToggle}
-          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+          aria-label="Mở sidebar"
         >
           ☰
         </button>
         <button
           onClick={onNewChat}
-          className="mt-4 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition text-xl"
+          className="mt-4 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition-all text-xl"
+          aria-label="Chat mới"
         >
           +
         </button>
@@ -38,7 +40,9 @@ function Sidebar({
   }
 
   return (
-    <aside className="w-72 bg-white rounded-r-3xl shadow-md flex flex-col h-screen">
+    <aside className={`w-72 bg-white rounded-r-3xl shadow-md flex flex-col h-screen transition-all duration-300 ${
+      isMobile && collapsed ? "transform -translate-x-full" : ""
+    } ${isMobile ? "fixed left-0 top-0 z-50" : ""}`}>
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
@@ -48,9 +52,20 @@ function Sidebar({
           {isMobile && (
             <button
               onClick={onToggle}
-              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+              aria-label="Đóng sidebar"
             >
               ✕
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              onClick={onToggle}
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+              aria-label="Thu gọn sidebar"
+              title="Thu gọn sidebar"
+            >
+              ←
             </button>
           )}
         </div>
@@ -170,7 +185,6 @@ function Sidebar({
           </div>
         </div>
         
-        {/* Logout Button - Chỉ hiển thị nếu user đã login */}
         {isUser && onLogout && (
           <button
             onClick={onLogout}

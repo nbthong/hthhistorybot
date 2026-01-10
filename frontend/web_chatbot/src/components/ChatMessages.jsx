@@ -21,7 +21,7 @@ const parseQuestions = (contentQuestions) => {
   return questions;
 };
 
-function ChatMessages({ messages, onSuggestionSelect }) {
+function ChatMessages({ messages, onSuggestionSelect, loadingConversationDetail }) {
   const bottomRef = useRef(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
@@ -42,6 +42,23 @@ function ChatMessages({ messages, onSuggestionSelect }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Hiển thị loading state khi đang load conversation detail
+  if (loadingConversationDetail) {
+    return (
+      <div className="flex-1 overflow-y-auto flex items-center justify-center px-10 py-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+          <p className="text-sm text-gray-500">Đang tải cuộc trò chuyện...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Chỉ hiển thị suggestions khi không có messages và không đang load
   if (!messages || messages.length === 0) {
     return <SuggestionsSection onSelectSuggestion={onSuggestionSelect} />;
   }
