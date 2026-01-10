@@ -1,24 +1,109 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import ChatMessages from "../components/ChatMessages";
 import ChatInput from "../components/ChatInput";
 import QuizModal from "../components/QuizModal";
 import useIsMobile from "../common/useIsMobile";
-import { useParams } from "react-router-dom";
+import {
+  isAuthenticated,
+  getAccessToken,
+  getUserEmail,
+  logoutWithAPI,
+} from "../utils/auth";
+import {
+  getConversationHistory,
+  getConversationDetail,
+} from "../api/chatApi";
+
+function generateSessionId() {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 export default function TheLayout() {
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
   const [messages, setMessages] = useState([]);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { session_id } = useParams();
+  
+  const [currentSessionId, setCurrentSessionId] = useState(() => generateSessionId());
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const isUser = isAuthenticated();
 
-  let value_session_id = session_id;
-  if (!value_session_id) {
-    value_session_id = new Date().toISOString().replace(/[:.-]/g, "");
-  }
+  useEffect(() => {
+    if (isUser) {
+      loadConversationHistory();
+    }
+  }, [isUser]);
+
+  const loadConversationHistory = async () => {
+    if (!isUser) return;
+    
+    setLoadingHistory(true);
+    try {
+      const history = await getConversationHistory();
+      const formattedHistory = history.map((item) => ({
+        id: item.session_id,
+        session_id: item.session_id,
+        title: item.title || item.message || "New Conversation",
+      }));
+      setConversations(formattedHistory);
+    } catch (error) {
+      console.error("Error loading conversation history:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleSelectConversation = async (sessionId) => {
+    if (!isUser || !sessionId) return;
+
+    setLoadingHistory(true);
+    setActiveConversationId(sessionId);
+    setCurrentSessionId(sessionId);
+
+    try {
+      const messages = await getConversationDetail(sessionId);
+      setMessages(messages);
+      setCollapsed(false);
+    } catch (error) {
+      console.error("Error loading conversation detail:", error);
+      setMessages([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    const newSessionId = generateSessionId();
+    setCurrentSessionId(newSessionId);
+    setActiveConversationId(null);
+    setMessages([]);
+    setCollapsed(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutWithAPI();
+      
+      setMessages([]);
+      setConversations([]);
+      setActiveConversationId(null);
+      setCurrentSessionId(generateSessionId());
+      setShowQuiz(false);
+      setQuiz([]);
+      
+      navigate("/login");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      navigate("/login");
+    }
+  };
 
   const parseQuestions = (contentQuestions) => {
     let questions = [];
@@ -42,6 +127,9 @@ export default function TheLayout() {
     setLoading(true);
     let isShowQuiz = false;
 
+    const isFirstMessage = messages.length === 0;
+    const isNewConversation = activeConversationId === null;
+    
     // Thêm user + 1 bot placeholder
     setMessages((prev) => [
       ...prev,
@@ -51,14 +139,27 @@ export default function TheLayout() {
 
     try {
       const apiURL = import.meta.env.VITE_API_URL;
-      const access_token = localStorage.getItem("access_token");
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      const token = getAccessToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const body = {
+        message: text,
+      };
+      
+      if (isUser && currentSessionId) {
+        body.session_id = currentSessionId;
+      }
+
       const res = await fetch(`${apiURL}/chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${access_token}`,
-        },
-        body: JSON.stringify({ message: text, session_id: value_session_id }),
+        headers,
+        body: JSON.stringify(body),
       });
 
       if (!res.ok || !res.body) throw new Error("Server error");
@@ -154,6 +255,13 @@ export default function TheLayout() {
       });
     } finally {
       setLoading(false);
+
+      if (isUser && isFirstMessage && isNewConversation) {
+        // Debounce để tránh reload quá nhiều lần và đợi backend lưu xong
+        setTimeout(() => {
+          loadConversationHistory();
+        }, 1000);
+      }
     }
   };
 
@@ -163,34 +271,50 @@ export default function TheLayout() {
   };
 
   const status_display = isMobile ? !collapsed : collapsed;
-  console.log("showQuiz: ", showQuiz);
+  const userEmail = getUserEmail();
+  
   return (
-    <>
-      <Sidebar
-        collapsed={status_display}
-        onToggle={() => setCollapsed(!collapsed)}
-      />
-      {isMobile && !status_display && (
-        <div className="sidebar-overlay" onClick={() => setCollapsed(false)} />
-      )}
-
-      <div className={`main ${status_display ? "collapsed" : ""}`}>
-        <div className="main-header p-2">
-          <button
-            className="btn-menu-mobile btn btn-light me-2"
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            ☰
-          </button>
-          <strong className="fs-5">Chat</strong>
-          {loading && <span className="ms-3">(đang trả lời...)</span>}
-        </div>
-        {showQuiz && (
-          <QuizModal onClose={() => setShowQuiz(false)} questions={quiz} />
+    <div className="bg-[#FDEDEA] h-screen overflow-hidden">
+      <div className="flex h-full">
+        <Sidebar
+          collapsed={status_display}
+          onToggle={() => setCollapsed(!collapsed)}
+          onNewChat={handleNewChat}
+          activeConversationId={activeConversationId}
+          conversations={conversations}
+          onSelectConversation={handleSelectConversation}
+          isUser={isUser}
+          loadingHistory={loadingHistory}
+          userEmail={userEmail}
+          onLogout={handleLogout}
+        />
+        
+        {isMobile && !status_display && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-40 z-40"
+            onClick={() => setCollapsed(true)}
+          />
         )}
-        <ChatMessages messages={messages} />
-        <ChatInput onSend={handleSend} disabled={loading} />
+
+        {/* Main Chat Area */}
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+          {showQuiz && (
+            <QuizModal onClose={() => setShowQuiz(false)} questions={quiz} />
+          )}
+          <ChatMessages 
+            messages={messages} 
+            onSuggestionSelect={(question) => {
+              handleSend(question);
+            }}
+          />
+          <ChatInput onSend={handleSend} disabled={loading} />
+          {loading && (
+            <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-lg shadow-md text-sm text-gray-600">
+              Đang trả lời...
+            </div>
+          )}
+        </main>
       </div>
-    </>
+    </div>
   );
 }

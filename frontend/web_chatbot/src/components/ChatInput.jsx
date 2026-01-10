@@ -1,46 +1,53 @@
 import { useState, useRef } from "react";
 
-function ChatInput({ onSend }) {
+function ChatInput({ onSend, disabled = false }) {
   const [text, setText] = useState("");
-  const [rows, setRows] = useState(1);
-  const textareaRef = useRef(null);
-
-  const MAX_ROWS = 5;
+  const inputRef = useRef(null);
 
   const handleChange = (e) => {
-    const value = e.target.value;
-    setText(value);
-    const currentRows = text.split("\n").length;
-
-    setRows(currentRows > MAX_ROWS ? MAX_ROWS : currentRows);
+    setText(e.target.value);
   };
 
-  const handleSubmit = () => {
-    if (!text.trim()) return;
+  const handleSubmit = (e) => {
+    e?.preventDefault();
+    if (!text.trim() || disabled) return;
     onSend(text);
     setText("");
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   return (
-    <div className="chat-input">
-      <div className="input-group align-items-end">
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          className="form-control textarea"
-          rows={rows}
-          placeholder="Nhập tin nhắn..."
+    <div className="mt-6 px-10">
+      <form onSubmit={handleSubmit} className="bg-white rounded-full shadow-md flex items-center px-5 py-3 gap-3">
+        <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-pink-500 text-sm">🧠</span>
+        </div>
+        
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="What's on your mind?"
+          className="flex-1 outline-none text-sm bg-transparent border-none"
           value={text}
           onChange={handleChange}
-          onBlur={handleChange}
-          style={{ resize: "none" }}
+          onKeyPress={handleKeyPress}
+          disabled={disabled}
         />
-
-        {/* Send */}
-        <button className="btn btn-primary" onClick={handleSubmit}>
+        
+        <button
+          type="submit"
+          disabled={disabled || !text.trim()}
+          className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           ➤
         </button>
-      </div>
+      </form>
     </div>
   );
 }
