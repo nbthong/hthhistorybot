@@ -172,7 +172,8 @@ class HistoryAIAgent:
     async def quiz_agent_stream(self, user_input: str, session_id: str = "default_user", user_id: Optional[str] = None) -> AsyncIterable[str]:
         try:
             yield json.dumps({"type": "status", "message": "🔍 Thầy đang tìm tài liệu cho em..."}, ensure_ascii=False) + "\n"
-            search_query = await self._condense_question_advanced(user_input, session_id)
+            history_str = await self._get_unified_history(session_id, user_id)
+            search_query = await self._condense_question_advanced(user_input, history_str)
             knowledges = await asyncio.to_thread(search_knowledge, search_query, limit=5, use_hybrid=True)
 
             context = "\n".join([k['content_text'] for k in knowledges])
@@ -195,11 +196,11 @@ class HistoryAIAgent:
 
             if user_id:
                 await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "user", f"Yêu cầu Quiz: {user_input}", None, "text")
-                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "assistant", "[Bộ câu hỏi trắc nghiệm]", None, "text")
+                await asyncio.to_thread(save_message_to_mongo, user_id, session_id, "assistant", full_quiz_content, None, "text")
             
             mem = self._get_session_memory(session_id)
             mem.append({"role": "Học sinh", "content": user_input, "message_type": "text"})
-            mem.append({"role": "Giáo viên", "content": "[Đã gửi bộ câu hỏi trắc nghiệm]", "message_type": "text"})
+            mem.append({"role": "Giáo viên", "content": full_quiz_content, "message_type": "text"})
 
         except Exception as e:
             logger.error(f"Quiz agent error: {e}", exc_info=True)

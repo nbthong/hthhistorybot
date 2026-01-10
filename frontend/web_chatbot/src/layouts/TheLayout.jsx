@@ -20,7 +20,15 @@ function generateSessionId() {
 export default function TheLayout() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [collapsed, setCollapsed] = useState(false);
+
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar_collapsed");
+      return saved === "true" ? true : false;
+    }
+    return false;
+  });
+
   const [messages, setMessages] = useState([]);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quiz, setQuiz] = useState([]);
@@ -33,12 +41,26 @@ export default function TheLayout() {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingConversationDetail, setLoadingConversationDetail] =
+    useState(false);
   const isUser = isAuthenticated();
+
+  useEffect(() => {
+    if (!isMobile) {
+      localStorage.setItem("sidebar_collapsed", collapsed.toString());
+    }
+  }, [collapsed, isMobile]);
+
+  // Toggle sidebar function
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed);
+  };
 
   useEffect(() => {
     if (isUser) {
       loadConversationHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUser]);
 
   const loadConversationHistory = async () => {
@@ -63,19 +85,24 @@ export default function TheLayout() {
   const handleSelectConversation = async (sessionId) => {
     if (!isUser || !sessionId) return;
 
-    setLoadingHistory(true);
+    // Cập nhật UI ngay lập tức để tránh delay
     setActiveConversationId(sessionId);
     setCurrentSessionId(sessionId);
+    setMessages([]);
+    setLoadingConversationDetail(true);
+
+    if (isMobile) {
+      setCollapsed(true);
+    }
 
     try {
       const messages = await getConversationDetail(sessionId);
       setMessages(messages);
-      setCollapsed(false);
     } catch (error) {
       console.error("Error loading conversation detail:", error);
       setMessages([]);
     } finally {
-      setLoadingHistory(false);
+      setLoadingConversationDetail(false);
     }
   };
 
@@ -84,7 +111,9 @@ export default function TheLayout() {
     setCurrentSessionId(newSessionId);
     setActiveConversationId(null);
     setMessages([]);
-    setCollapsed(false);
+    if (isMobile) {
+      setCollapsed(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -198,15 +227,15 @@ export default function TheLayout() {
             buffer_err = "";
             data = item_json;
             console.log(item_json);
-          } catch (error) {
+          } catch {
             buffer_err += item_buffer;
             try {
               console.log(buffer_err);
               const item_json = JSON.parse(buffer_err);
               data = item_json;
               console.log(item_json);
-            } catch (error) {
-              console.log(error);
+            } catch (finalError) {
+              console.log(finalError);
             }
           }
           if (data == null || data == undefined) break;
@@ -280,7 +309,7 @@ export default function TheLayout() {
       <div className="flex h-full">
         <Sidebar
           collapsed={status_display}
-          onToggle={() => setCollapsed(!collapsed)}
+          onToggle={toggleSidebar}
           onNewChat={handleNewChat}
           activeConversationId={activeConversationId}
           conversations={conversations}
@@ -293,13 +322,13 @@ export default function TheLayout() {
 
         {isMobile && !status_display && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-40 z-40"
+            className="fixed inset-0 bg-black bg-opacity-40 z-40 transition-opacity"
             onClick={() => setCollapsed(true)}
           />
         )}
 
         {/* Main Chat Area */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative transition-all duration-300">
           {showQuiz && (
             <QuizModal onClose={() => setShowQuiz(false)} questions={quiz} />
           )}
@@ -310,6 +339,7 @@ export default function TheLayout() {
             }}
             statusLoading={loading}
             statusLoadingQuiz={loadingQuiz}
+            loadingConversationDetail={loadingConversationDetail}
           />
           <ChatInput onSend={handleSend} disabled={loading} />
         </main>

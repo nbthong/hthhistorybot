@@ -20,16 +20,18 @@ function Sidebar({
 
   if (collapsed && !isMobile) {
     return (
-      <aside className="w-20 bg-white rounded-r-3xl shadow-md flex flex-col items-center py-4">
+      <aside className="w-20 bg-white rounded-r-3xl shadow-md flex flex-col items-center py-4 transition-all duration-300">
         <button
           onClick={onToggle}
-          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+          aria-label="Mở sidebar"
         >
           ☰
         </button>
         <button
           onClick={onNewChat}
-          className="mt-4 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition text-xl"
+          className="mt-4 w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 transition-all text-xl"
+          aria-label="Chat mới"
         >
           +
         </button>
@@ -38,7 +40,9 @@ function Sidebar({
   }
 
   return (
-    <aside className="w-72 bg-white rounded-r-3xl shadow-md flex flex-col h-screen">
+    <aside className={`w-72 bg-white rounded-r-3xl shadow-md flex flex-col h-screen transition-all duration-300 ${
+      isMobile && collapsed ? "transform -translate-x-full" : ""
+    } ${isMobile ? "fixed left-0 top-0 z-50" : ""}`}>
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
@@ -48,9 +52,20 @@ function Sidebar({
           {isMobile && (
             <button
               onClick={onToggle}
-              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+              aria-label="Đóng sidebar"
             >
               ✕
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              onClick={onToggle}
+              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 transition-colors"
+              aria-label="Thu gọn sidebar"
+              title="Thu gọn sidebar"
+            >
+              ←
             </button>
           )}
         </div>
@@ -59,17 +74,17 @@ function Sidebar({
           className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white py-2 rounded-xl hover:bg-indigo-600 transition"
         >
           <span className="text-lg">+</span>
-          New chat
+          Tạo cuộc trò chuyện mới
         </button>
       </div>
 
       {isUser && (
         <div className="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-400 text-xs">Your conversations</p>
+            <p className="text-gray-400 text-xs">Cuộc trò chuyện của bạn</p>
             {displayConversations.length > 0 && (
               <button className="text-xs text-gray-400 hover:text-gray-600">
-                Clear All
+                Xóa tất cả
               </button>
             )}
           </div>
@@ -140,7 +155,7 @@ function Sidebar({
               >
                 Login
               </a>{" "}
-              to save and view your conversation history
+              để lưu và xem lịch sử cuộc trò chuyện của bạn
             </p>
           </div>
         </div>
@@ -160,7 +175,7 @@ function Sidebar({
             </p>
             <p className="text-xs text-gray-400">
               {isUser ? (
-                <span className="text-gray-400">Settings</span>
+                <span className="text-gray-400">Cài đặt</span>
               ) : (
                 <a href="/login" className="text-indigo-500 hover:underline">
                   Login
@@ -170,14 +185,13 @@ function Sidebar({
           </div>
         </div>
         
-        {/* Logout Button - Chỉ hiển thị nếu user đã login */}
         {isUser && onLogout && (
           <button
             onClick={onLogout}
             className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition flex items-center justify-center gap-2"
           >
             <span>🚪</span>
-            Logout
+            Đăng xuất
           </button>
         )}
       </div>
