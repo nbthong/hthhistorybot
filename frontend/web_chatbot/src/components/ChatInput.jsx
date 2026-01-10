@@ -32,7 +32,7 @@ function ChatInput({ onSend, disabled = false }) {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Aks anything you want about History"
+          placeholder="Hỏi gì về lịch sử đi em"
           className="flex-1 outline-none text-sm bg-transparent border-none"
           value={text}
           onChange={handleChange}

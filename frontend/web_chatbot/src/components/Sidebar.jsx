@@ -74,17 +74,17 @@ function Sidebar({
           className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white py-2 rounded-xl hover:bg-indigo-600 transition"
         >
           <span className="text-lg">+</span>
-          New chat
+          Tạo cuộc trò chuyện mới
         </button>
       </div>
 
       {isUser && (
         <div className="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-gray-400 text-xs">Your conversations</p>
+            <p className="text-gray-400 text-xs">Cuộc trò chuyện của bạn</p>
             {displayConversations.length > 0 && (
               <button className="text-xs text-gray-400 hover:text-gray-600">
-                Clear All
+                Xóa tất cả
               </button>
             )}
           </div>
@@ -155,7 +155,7 @@ function Sidebar({
               >
                 Login
               </a>{" "}
-              to save and view your conversation history
+              để lưu và xem lịch sử cuộc trò chuyện của bạn
             </p>
           </div>
         </div>
@@ -175,7 +175,7 @@ function Sidebar({
             </p>
             <p className="text-xs text-gray-400">
               {isUser ? (
-                <span className="text-gray-400">Settings</span>
+                <span className="text-gray-400">Cài đặt</span>
               ) : (
                 <a href="/login" className="text-indigo-500 hover:underline">
                   Login
@@ -191,7 +191,7 @@ function Sidebar({
             className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition flex items-center justify-center gap-2"
           >
             <span>🚪</span>
-            Logout
+            Đăng xuất
           </button>
         )}
       </div>
