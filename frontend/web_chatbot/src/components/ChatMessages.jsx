@@ -111,7 +111,10 @@ function ChatMessages({
 
           if (isBot) {
             return (
-              <div key={i} className="flex gap-4">
+              <div
+                key={i}
+                className={statusLoading ? "flex gap-4 items-end" : "flex gap-4"}
+              >
                 <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center flex justify-center text-white font-bold flex-shrink-0">
                   {statusLoading && i == messages.length - 1 ? (
                     <span className="loading-spinner">⏳️</span>
