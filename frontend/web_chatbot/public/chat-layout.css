@@ -10,3 +10,7 @@
     transform: rotate(360deg);
   }
 }
+
+.chat-image {
+  width: 50%;
+}
