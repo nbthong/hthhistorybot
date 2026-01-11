@@ -1,7 +1,7 @@
-# hthhistorybot
+# hthhistoryAIAssisstant
 # ReactJS + FastAPI + Docker
 
-A **minimal, lightweight, and production-ready chatbot template** using:
+A **minimal, lightweight, and production-ready assisstant template** using:
 
 - **ReactJS** for the frontend
 - **FastAPI** for the backend API
@@ -14,7 +14,8 @@ A **minimal, lightweight, and production-ready chatbot template** using:
 ```
 .
 ├── backend/
-│   ├── main.py              # FastAPI app
+│   ├── app              
+│   │   └── main.py   # FastAPI app
 │   ├── requirements.txt     # Python dependencies
 │   └── Dockerfile           # Backend Docker image
 ├── frontend/
@@ -23,5 +24,5 @@ A **minimal, lightweight, and production-ready chatbot template** using:
 │   ├── index.html
 │   ├── package.json
 │   └── Dockerfile           # Frontend Docker image
-├── docker-compose.yml       # Run frontend + backend + database together
+├── docker-compose.yml       # Run frontend + backend
 └── README.md

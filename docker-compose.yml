@@ -1,6 +1,7 @@
 services:
   backend:
-    build:
+    build: 
+      dockerfile: ./backend/Dockerfile
       context: ./backend
     container_name: fastapi-backend
     ports:
@@ -8,13 +9,23 @@ services:
     env_file:
       - ./backend/.env
     restart: always
+    networks:
+      - app-network
 
   frontend:
     build:
       context: ./frontend/web_chatbot
+      args:
+        - VITE_API_URL=http://54.179.11.118
     container_name: reactjs-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
-    restart: alwaysd
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
